@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AlphaEdgeLogo } from "@/components/ui/logo";
 
 type AlphaEdgeTheme = "dark" | "light";
 
@@ -174,8 +175,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function Brand() {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-teal-300/20 bg-teal-300/10 shadow-inset">
-        <Sparkles className="h-4 w-4 text-teal-100" />
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-inset bg-[#03130d] border border-[#10b981]/20">
+        <AlphaEdgeLogo className="h-[200%] w-[200%] -ml-[5%] -mb-[5%]" />
       </div>
       <div>
         <div className="text-sm font-semibold text-white">AlphaEdge</div>

@@ -9,6 +9,7 @@ import { getUserWatchlistSymbols } from "@/lib/watchlist-server";
 import { Badge } from "@/components/ui/badge";
 import { Bell, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AlphaEdgeLogo } from "@/components/ui/logo";
 
 export const revalidate = 300;
 
@@ -34,7 +35,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
             <span className="h-1 w-1 rounded-full bg-zinc-700" />
             <span>{stockFeedLabel}</span>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 sm:items-end sm:gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-2 sm:items-center sm:gap-3">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-inset bg-[#03130d] border border-[#10b981]/20">
+              <AlphaEdgeLogo className="h-[200%] w-[200%] -ml-[5%] -mb-[5%]" />
+            </div>
             <h1 className="text-2xl font-semibold tracking-normal text-white sm:text-4xl">AlphaEdge</h1>
             <Badge tone={data.providerStatus.stocksLive ? "gain" : "neutral"}>
               {data.providerStatus.stocksLive ? data.dataSource : "เพิ่ม API เพื่อใช้ข้อมูลสด"}
