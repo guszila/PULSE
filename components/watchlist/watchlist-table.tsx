@@ -83,7 +83,9 @@ export function WatchlistTable({ stocks, saved }: { stocks: WatchlistStock[]; sa
               <div className="ml-3 flex shrink-0 items-center gap-3 text-right">
                 <div>
                   <div className="text-sm font-semibold text-zinc-100">{formatCurrency(stock.price)}</div>
-                  <div className="mt-1 text-[11px] text-zinc-500">{formatCompact(stock.volume)} วอลุ่ม</div>
+                  <div className="mt-1 text-[11px] text-zinc-500">
+                    {stock.volume > 0 ? `${formatCompact(stock.volume)} วอลุ่ม` : "N/A"}
+                  </div>
                 </div>
                 <button
                   onClick={(e) => handleRemove(e, stock.symbol)}
@@ -125,8 +127,8 @@ export function WatchlistTable({ stocks, saved }: { stocks: WatchlistStock[]; sa
                     {stock.change >= 0 ? "+" : ""}
                     {stock.change.toFixed(2)}%
                   </TableCell>
-                  <TableCell className="text-right">{formatCompact(stock.volume)}</TableCell>
-                  <TableCell className="text-right">{formatCompact(stock.marketCap)}</TableCell>
+                  <TableCell className="text-right">{stock.volume > 0 ? formatCompact(stock.volume) : "-"}</TableCell>
+                  <TableCell className="text-right">{stock.marketCap > 0 ? formatCompact(stock.marketCap) : "-"}</TableCell>
                   <TableCell className="text-right">
                     <button
                       onClick={(e) => handleRemove(e, stock.symbol)}
