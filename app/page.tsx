@@ -63,7 +63,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
           decision={data.decision}
           selectedStock={data.selectedStock}
           supportResistance={data.supportResistance}
-          watchlists={userSymbols || ["AAPL", "MSFT", "GOOGL"]}
+          watchlist={data.watchlist}
+          updatedAt={data.timestamp}
         />
       </section>
 
