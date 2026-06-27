@@ -1,6 +1,7 @@
 import { getDashboardData } from "@/lib/free-market-api";
 import { DecisionHero } from "@/components/dashboard/decision-hero";
 import { MarketOverviewCard } from "@/components/dashboard/market-overview-card";
+import { NewsCard } from "@/components/stock/news-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { Card } from "@/components/ui/card";
@@ -67,6 +68,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
       <section id="dashboard" className="mt-8">
         <SectionTitle eyebrow="ตลาด" title="ภาพรวมตลาดวันนี้" />
         <MarketOverviewCard data={data} />
+      </section>
+
+      <section id="news" className="mt-8">
+        <SectionTitle eyebrow="ข่าวสาร" title={`อัปเดตล่าสุด: ${data.selectedStock.symbol}`} />
+        <NewsCard items={data.news} />
       </section>
     </>
   );
