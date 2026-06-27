@@ -12,7 +12,13 @@ const prompt = Prompt({
 
 export const metadata: Metadata = {
   title: "AlphaEdge",
-  description: "A mobile-first US stock decision app."
+  description: "A mobile-first US stock decision app.",
+  applicationName: "AlphaEdge",
+  appleWebApp: {
+    capable: true,
+    title: "AlphaEdge",
+    statusBarStyle: "black-translucent"
+  }
 };
 
 export const viewport: Viewport = {
