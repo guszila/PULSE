@@ -1,17 +1,12 @@
 import { AlphaEdgeLogo } from "@/components/ui/logo";
-import { DecisionHero } from "@/components/dashboard/decision-hero";
-import { MarketOverviewCard } from "@/components/dashboard/market-overview-card";
-import { NewsCard } from "@/components/stock/news-card";
-import { SectionTitle } from "@/components/shared/section-title";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { MarketStatus } from "@/components/shared/market-status";
-import { Card } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUserWatchlistSymbols } from "@/lib/watchlist-server";
-import { getDashboardData } from "@/lib/free-market-api";
-import Link from "next/link";
-import { ArrowRight, Activity, TrendingUp } from "lucide-react";
+import { Suspense } from "react";
+import { DashboardContent } from "@/components/dashboard/dashboard-content";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 
 export const revalidate = 300;
 
@@ -19,12 +14,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   const resolvedParams = await searchParams;
   const symbol = resolvedParams.symbol?.toUpperCase() || "AAPL";
   const supabase = await createSupabaseServerClient();
-  const [{ data: authData }, userSymbols] = await Promise.all([
+  const [, userSymbols] = await Promise.all([
     supabase.auth.getUser(),
     getUserWatchlistSymbols()
   ]);
-  const data = await getDashboardData(symbol, userSymbols);
-  const stockFeedLabel = data.providerStatus.stocksLive ? "ข้อมูลสด" : "ข้อมูลตัวอย่าง";
 
   return (
     <>
@@ -36,7 +29,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
             <span className="h-1 w-1 rounded-full bg-zinc-700" />
             <span>ตัวช่วยดูหุ้นรายวัน</span>
             <span className="h-1 w-1 rounded-full bg-zinc-700" />
-            <span>{stockFeedLabel}</span>
+            <span>สรุปข้อมูลตลาด</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 sm:items-center sm:gap-3">
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-inset bg-[#03130d] border border-[#10b981]/20">
@@ -58,45 +51,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
         </div>
       </header>
 
-      <section className="mt-4 sm:mt-6">
-        <DecisionHero
-          decision={data.decision}
-          selectedStock={data.selectedStock}
-          supportResistance={data.supportResistance}
-          watchlist={data.watchlist}
-          updatedAt={data.timestamp}
-        />
-      </section>
-
-      <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <SectionTitle icon={Activity}>
-              มุมมองตลาด <span className="text-zinc-500 font-normal ml-1">Market Setup</span>
-            </SectionTitle>
-            <Link 
-              href="/markets" 
-              className="group flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
-            >
-              ดูทั้งหมด
-              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-          <MarketOverviewCard data={data} />
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <SectionTitle icon={TrendingUp}>
-              ข่าวล่าสุด <span className="text-zinc-500 font-normal ml-1">Latest News</span>
-            </SectionTitle>
-            <span className="text-[10px] font-medium text-emerald-400 border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 rounded-full">
-              อัปเดตเรียลไทม์
-            </span>
-          </div>
-          <NewsCard items={data.news} />
-        </section>
-      </div>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent symbol={symbol} userSymbols={userSymbols} />
+      </Suspense>
     </>
   );
 }

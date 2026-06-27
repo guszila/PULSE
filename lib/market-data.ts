@@ -228,21 +228,21 @@ export const news: NewsItem[] = [
     summary: "Channel inventory has tightened while premium models continue to take share in US carrier stores.",
     sentiment: "Positive",
     source: "MarketDesk",
-    time: "24 min ago"
+    time: "24 นาทีที่แล้ว (27 มิ.ย. 16:45)"
   },
   {
     headline: "Mega-cap technology leads as rates stabilize",
     summary: "Portfolio managers rotated back into durable free-cash-flow leaders after Treasury volatility eased.",
     sentiment: "Positive",
     source: "Street Ledger",
-    time: "1 hr ago"
+    time: "1 ชั่วโมงที่แล้ว (27 มิ.ย. 15:58)"
   },
   {
     headline: "Regulators review app store payment compliance",
     summary: "Analysts expect limited near-term earnings impact, but headline risk may remain elevated.",
     sentiment: "Neutral",
     source: "Capitol Markets",
-    time: "2 hrs ago"
+    time: "2 ชั่วโมงที่แล้ว (27 มิ.ย. 14:30)"
   }
 ];
 

@@ -644,20 +644,27 @@ function formatPercent(value: unknown) {
 function formatRelativeTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Recent";
+    return "ล่าสุด";
   }
+
+  const formattedDate = date.toLocaleString('th-TH', { 
+    day: 'numeric', 
+    month: 'short', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
 
   const minutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
   if (minutes < 60) {
-    return `${minutes} min ago`;
+    return `${minutes} นาทีที่แล้ว (${formattedDate})`;
   }
 
   const hours = Math.round(minutes / 60);
   if (hours < 24) {
-    return `${hours} hr ago`;
+    return `${hours} ชั่วโมงที่แล้ว (${formattedDate})`;
   }
 
-  return `${Math.round(hours / 24)} days ago`;
+  return `${Math.round(hours / 24)} วันที่แล้ว (${formattedDate})`;
 }
 
 function formatDate(date: Date) {

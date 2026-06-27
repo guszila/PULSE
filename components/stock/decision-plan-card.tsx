@@ -16,9 +16,18 @@ export function DecisionPlanCard({ decision, supportResistance }: { decision: De
             <Zap className="h-4 w-4 text-amber-400" />
             ตัวช่วยตัดสินใจ
           </CardTitle>
-          <Badge tone={isBullish ? "gain" : isBearish ? "loss" : "neutral"} className="px-3 py-1 font-bold shadow-glass">
-            {thaiAction(decision.actionLabel)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/20">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              REAL-TIME
+            </div>
+            <Badge tone={isBullish ? "gain" : isBearish ? "loss" : "neutral"} className="px-3 py-1 font-bold shadow-glass text-xs">
+              {thaiAction(decision.actionLabel)}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -37,44 +46,60 @@ export function DecisionPlanCard({ decision, supportResistance }: { decision: De
           ))}
         </div>
         
-        {/* Rows layout instead of bulky boxes */}
-        <div className="space-y-2.5">
+        {/* Prominent Suggested Entry Box */}
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.05] p-5 shadow-[0_0_15px_rgba(16,185,129,0.1)] text-center">
+          <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none"></div>
+          <div className="absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+          
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="flex items-center gap-1.5 text-emerald-400 mb-1">
+              <Target className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-wide">ราคาที่น่าสนใจ (Suggested Entry)</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight my-2">
+              {supportResistance.suggestedEntry}
+            </div>
+            <div className="text-[11px] text-zinc-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+              โซนปลอดภัยตราบใดที่ไม่หลุดแนวรับ <span className="text-zinc-200 font-semibold">${supportResistance.support}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Rows layout for other info */}
+        <div className="grid gap-2.5 sm:grid-cols-2">
           {[
             {
-              label: "จุดน่าสนใจ",
-              value: `แถว $${supportResistance.suggestedEntry} และไม่หลุดรับ $${supportResistance.support}`,
-              icon: Target,
-              style: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
-            },
-            {
               label: "จุดที่ควรระวัง",
-              value: `หลุด $${supportResistance.breakdownLevel} แผนจะเริ่มอ่อนลง`,
+              value: `หลุด ${supportResistance.breakdownLevel} แผนจะเริ่มอ่อนลง`,
               icon: AlertTriangle,
-              style: "text-rose-400 bg-rose-400/10 border-rose-400/20"
+              style: "text-rose-400 bg-rose-400/10 border-rose-400/20",
+              glow: "group-hover:shadow-[0_0_15px_rgba(251,113,133,0.15)]"
             },
             {
               label: "สัญญาณบวก",
-              value: `ยืนเหนือ $${supportResistance.breakoutLevel} ได้พร้อมวอลุ่ม`,
+              value: `ยืนเหนือ ${supportResistance.breakoutLevel} ได้พร้อมวอลุ่ม`,
               icon: TrendingUp,
-              style: "text-sky-400 bg-sky-400/10 border-sky-400/20"
+              style: "text-sky-400 bg-sky-400/10 border-sky-400/20",
+              glow: "group-hover:shadow-[0_0_15px_rgba(56,189,248,0.15)]"
             },
             {
-              label: "คุ้มเสี่ยง",
-              value: `${supportResistance.riskReward} คือผลตอบแทนเทียบความเสี่ยง`,
+              label: "ความเสี่ยง-ผลตอบแทน",
+              value: `อัตราส่วน ${supportResistance.riskReward}`,
               icon: Scale,
-              style: "text-amber-400 bg-amber-400/10 border-amber-400/20"
+              style: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+              glow: "group-hover:shadow-[0_0_15px_rgba(251,191,36,0.15)]"
             }
           ].map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.label} className="group flex items-start gap-3 rounded-xl border border-white/[0.04] p-3.5 transition-colors hover:bg-white/[0.03]">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${item.style}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="pt-0.5">
+              <div key={item.label} className={`group relative flex flex-col gap-2 rounded-xl border border-white/[0.04] bg-white/[0.01] p-4 transition-all duration-300 hover:bg-white/[0.03] hover:-translate-y-0.5 cursor-default ${item.glow}`}>
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${item.style} transition-transform group-hover:scale-110`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
                   <div className="text-xs font-bold text-zinc-200 group-hover:text-white transition-colors">{item.label}</div>
-                  <p className="mt-1 text-[11px] leading-5 text-zinc-400">{item.value}</p>
                 </div>
+                <p className="text-[11px] leading-relaxed text-zinc-400 pl-9.5 group-hover:text-zinc-300 transition-colors">{item.value}</p>
               </div>
             );
           })}
