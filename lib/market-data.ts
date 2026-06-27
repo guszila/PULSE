@@ -143,9 +143,7 @@ export const marketOverview: MarketOverviewItem[] = [
   { name: "NASDAQ", value: "18,742.18", change: 0.92 },
   { name: "Dow Jones", value: "42,188.20", change: 0.28 },
   { name: "Russell 2000", value: "2,238.91", change: -0.18 },
-  { name: "VIX", value: "14.82", change: -3.41 },
-  { name: "US10Y Treasury", value: "4.18%", change: 0.05 },
-  { name: "Fear & Greed", value: "67", change: 4.0 }
+  { name: "VIX", value: "14.82", change: -3.41 }
 ];
 
 export const sectors = [

@@ -261,12 +261,10 @@ async function getMarketOverview(): Promise<ProviderResult<MarketOverviewItem[]>
 
   const rows = mappedRows.map((item) => item.row);
   const hasLiveOverview = mappedRows.some((item) => item.hasLivePrice);
-  const treasury = fallbackMarketOverview.find((item) => item.name === "US10Y Treasury");
-  const fearGreed = fallbackMarketOverview.find((item) => item.name === "Fear & Greed");
 
   return hasLiveOverview
     ? {
-        data: [...rows, treasury, fearGreed].filter(Boolean) as MarketOverviewItem[],
+        data: rows,
         source: "Finnhub",
         live: true
       }
