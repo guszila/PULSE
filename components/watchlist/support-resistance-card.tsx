@@ -3,7 +3,7 @@ import { PricePositionBar } from "@/components/dashboard/decision-hero";
 import type { SupportResistanceData } from "@/lib/market-data";
 import { thaiVolume, thaiBiasLike } from "@/lib/formatters";
 
-export function SupportResistanceCard({ supportResistance }: { supportResistance: SupportResistanceData }) {
+export function SupportResistanceCard({ supportResistance, symbol }: { supportResistance: SupportResistanceData; symbol?: string }) {
   const stats = [
     ["ระยะถึงแนวรับ", supportResistance.distanceToSupport],
     ["ระยะถึงแนวต้าน", supportResistance.distanceToResistance],
@@ -19,7 +19,9 @@ export function SupportResistanceCard({ supportResistance }: { supportResistance
   return (
     <Card>
       <CardHeader>
-        <CardTitle>แผนที่แนวรับและแนวต้าน</CardTitle>
+        <CardTitle>
+          แผนที่แนวรับและแนวต้าน {symbol && <span className="text-zinc-500 font-normal">({symbol})</span>}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <PricePositionBar supportResistance={supportResistance} />
