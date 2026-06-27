@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { FundamentalItem } from "@/lib/market-data";
+import { Briefcase } from "lucide-react";
 
 const DESCRIPTIONS: Record<string, string> = {
   "มูลค่าตลาด": "ขนาดบริษัทโดยรวม",
@@ -21,31 +22,34 @@ const DESCRIPTIONS: Record<string, string> = {
 
 export function FundamentalsCard({ items }: { items: FundamentalItem[] }) {
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>วิเคราะห์พื้นฐาน</CardTitle>
-        <Badge>มูลค่ายุติธรรม</Badge>
+    <Card className="overflow-hidden">
+      <CardHeader className="flex-row items-center justify-between bg-white/[0.02] pb-4">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Briefcase className="h-4 w-4 text-emerald-400" />
+          วิเคราะห์พื้นฐาน
+        </CardTitle>
+        <Badge className="bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20 border-emerald-400/20">มูลค่ายุติธรรม</Badge>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+      <CardContent className="pt-5">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
           {items.map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] text-zinc-400 font-medium leading-tight">{label}</div>
-                <div className="text-[9px] text-zinc-600 mt-0.5 leading-tight">{DESCRIPTIONS[label] || "ข้อมูลพื้นฐาน"}</div>
+            <div key={label} className="flex flex-col">
+              <div className="text-[11px] font-medium text-zinc-500">{label}</div>
+              <div className="mt-1 text-sm font-bold text-zinc-100">{value}</div>
+              <div className="mt-1 text-[9px] text-zinc-600 line-clamp-1" title={DESCRIPTIONS[label]}>
+                {DESCRIPTIONS[label] || "ข้อมูลพื้นฐาน"}
               </div>
-              <div className="mt-2 text-sm font-semibold text-zinc-100">{value}</div>
             </div>
           ))}
         </div>
-        <div className="mt-4">
-          <div className="mb-2 flex justify-between text-xs text-zinc-500">
-            <span>ต่ำกว่ามูลค่า</span>
-            <span>มูลค่ายุติธรรม</span>
-            <span>แพงกว่ามูลค่า</span>
+        <div className="mt-6 pt-5 border-t border-white/[0.06]">
+          <div className="mb-2 flex justify-between text-[10px] font-medium text-zinc-500">
+            <span>ต่ำกว่ามูลค่า (Undervalued)</span>
+            <span className="text-amber-400">มูลค่ายุติธรรม (Fair)</span>
+            <span>แพงกว่ามูลค่า (Overvalued)</span>
           </div>
-          <div className="h-2 rounded-full bg-white/[0.07]">
-            <div className="h-2 w-[56%] rounded-full bg-amber-300" />
+          <div className="h-2 rounded-full bg-white/[0.04] overflow-hidden shadow-inset">
+            <div className="h-full w-[56%] rounded-full bg-[linear-gradient(90deg,rgba(16,185,129,0.8),rgba(245,158,11,0.8))]" />
           </div>
         </div>
       </CardContent>

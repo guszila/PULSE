@@ -57,17 +57,17 @@ export default async function StockSymbolPage({ params }: { params: Promise<{ sy
               symbol={data.selectedStock.symbol}
               theme={"dark"} 
             />
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-y-2 rounded-xl bg-white/[0.02] px-4 py-3 sm:gap-4">
               {[
                 ["เปิด", formatCurrency(data.selectedStock.open)],
                 ["สูงสุด", formatCurrency(data.selectedStock.high)],
                 ["ต่ำสุด", formatCurrency(data.selectedStock.low)],
                 ["ปิด", formatCurrency(data.selectedStock.close)],
-                ["ปริมาณซื้อขาย", formatCompact(data.selectedStock.volume)]
+                ["วอลุ่ม", formatCompact(data.selectedStock.volume)]
               ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
-                  <div className="text-xs text-zinc-500">{label}</div>
-                  <div className="mt-1 text-sm font-medium text-zinc-100">{value}</div>
+                <div key={label} className="flex flex-col items-start sm:items-center">
+                  <div className="text-[10px] text-zinc-500">{label}</div>
+                  <div className="text-sm font-semibold text-zinc-200">{value}</div>
                 </div>
               ))}
             </div>
