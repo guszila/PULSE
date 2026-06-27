@@ -152,7 +152,7 @@ export function WatchlistTable({ stocks, saved }: { stocks: WatchlistStock[]; sa
             disabled={isPending}
             className="h-10 w-full max-w-[200px] rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 text-sm text-white placeholder-zinc-500 focus:border-teal-500/50 focus:outline-none"
           />
-          <Button type="submit" disabled={!newSymbol.trim() || isPending} variant="secondary" className="h-10">
+          <Button type="submit" disabled={!newSymbol.trim() || isPending} variant="outline" className="h-10">
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
             เพิ่ม
           </Button>

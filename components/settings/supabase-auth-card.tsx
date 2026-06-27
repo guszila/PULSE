@@ -76,7 +76,7 @@ export function SupabaseAuthCard({
               <Button type="submit" disabled={busy} className="flex-1 sm:flex-none">
                 เข้าสู่ระบบ
               </Button>
-              <Button type="button" variant="secondary" disabled={busy} onClick={onSignUp} className="flex-1 sm:flex-none">
+              <Button type="button" variant="outline" disabled={busy} onClick={onSignUp} className="flex-1 sm:flex-none">
                 สมัครสมาชิก
               </Button>
             </div>
