@@ -6,6 +6,7 @@ import { FundamentalsCard } from "@/components/stock/fundamentals-card";
 import { NewsCard } from "@/components/stock/news-card";
 import { StockChartSection } from "@/components/stock/stock-chart-section";
 import { GlobalSearch } from "@/components/shared/global-search";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 
 export const revalidate = 300;
 
@@ -17,6 +18,7 @@ export default async function StockSymbolPage({ params }: { params: Promise<{ sy
 
   return (
     <>
+      <AutoRefresh intervalMs={60000} />
       <div className="mt-2 mb-4">
         <GlobalSearch />
       </div>

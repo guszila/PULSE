@@ -1,16 +1,17 @@
-import { getDashboardData } from "@/lib/free-market-api";
+import { AlphaEdgeLogo } from "@/components/ui/logo";
 import { DecisionHero } from "@/components/dashboard/decision-hero";
 import { MarketOverviewCard } from "@/components/dashboard/market-overview-card";
 import { NewsCard } from "@/components/stock/news-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { GlobalSearch } from "@/components/shared/global-search";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { MarketStatus } from "@/components/shared/market-status";
 import { Card } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUserWatchlistSymbols } from "@/lib/watchlist-server";
-import { Badge } from "@/components/ui/badge";
-import { Bell, PanelRightOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { AlphaEdgeLogo } from "@/components/ui/logo";
+import { getDashboardData } from "@/lib/free-market-api";
+import Link from "next/link";
+import { ArrowRight, Activity, TrendingUp } from "lucide-react";
 
 export const revalidate = 300;
 
@@ -27,6 +28,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
 
   return (
     <>
+      <AutoRefresh intervalMs={60000} />
       <header className="mb-3 flex flex-col gap-3 border-b border-white/[0.07] pb-3 sm:mb-5 sm:gap-4 sm:pb-5 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase text-zinc-500 sm:gap-2 sm:text-xs">
@@ -40,40 +42,60 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-inset bg-[#03130d] border border-[#10b981]/20">
               <AlphaEdgeLogo className="h-[200%] w-[200%] -ml-[5%] -mb-[5%]" />
             </div>
-            <h1 className="text-2xl font-semibold tracking-normal text-white sm:text-4xl">AlphaEdge</h1>
-            <Badge tone={data.providerStatus.stocksLive ? "gain" : "neutral"}>
-              {data.providerStatus.stocksLive ? data.dataSource : "เพิ่ม API เพื่อใช้ข้อมูลสด"}
-            </Badge>
+            <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+              สรุปวันนี้ <span className="text-zinc-500 font-medium ml-1">Market Pulse</span>
+            </h1>
+            <div className="ml-2 hidden sm:block">
+              <MarketStatus />
+            </div>
+          </div>
+          <div className="mt-3 block sm:hidden">
+            <MarketStatus />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full xl:w-72 mt-2 xl:mt-0">
           <GlobalSearch />
-          <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Notifications">
-            <Bell className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Open AI sidebar">
-            <PanelRightOpen className="h-4 w-4" />
-          </Button>
         </div>
       </header>
 
-      <DecisionHero
-        decision={data.decision}
-        selectedStock={data.selectedStock}
-        supportResistance={data.supportResistance}
-        updatedAt={data.updatedAt}
-        watchlist={data.watchlist}
-      />
-
-      <section id="dashboard" className="mt-8">
-        <SectionTitle eyebrow="ตลาด" title="ภาพรวมตลาดวันนี้" />
-        <MarketOverviewCard data={data} />
+      <section className="mt-4 sm:mt-6">
+        <DecisionHero
+          decision={data.decision}
+          selectedStock={data.selectedStock}
+          supportResistance={data.supportResistance}
+          watchlists={userSymbols || ["AAPL", "MSFT", "GOOGL"]}
+        />
       </section>
 
-      <section id="news" className="mt-8">
-        <SectionTitle eyebrow="ข่าวสาร" title={`อัปเดตล่าสุด: ${data.selectedStock.symbol}`} />
-        <NewsCard items={data.news} />
-      </section>
+      <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <SectionTitle icon={Activity}>
+              มุมมองตลาด <span className="text-zinc-500 font-normal ml-1">Market Setup</span>
+            </SectionTitle>
+            <Link 
+              href="/markets" 
+              className="group flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            >
+              ดูทั้งหมด
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+          <MarketOverviewCard items={data.overview} />
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <SectionTitle icon={TrendingUp}>
+              ข่าวล่าสุด <span className="text-zinc-500 font-normal ml-1">Latest News</span>
+            </SectionTitle>
+            <span className="text-[10px] font-medium text-emerald-400 border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 rounded-full">
+              อัปเดตเรียลไทม์
+            </span>
+          </div>
+          <NewsCard items={data.news} />
+        </section>
+      </div>
     </>
   );
 }
