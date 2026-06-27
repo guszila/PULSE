@@ -373,7 +373,8 @@ function mapFmpNews(symbol: string, data: Array<Record<string, unknown>> | null)
     summary: String(item.text ?? item.snippet ?? item.summary ?? "No summary available.").slice(0, 180),
     sentiment: "Neutral" as const,
     source: String(item.site ?? item.publisher ?? item.source ?? "FMP"),
-    time: formatRelativeTime(String(item.publishedDate ?? item.date ?? ""))
+    time: formatRelativeTime(String(item.publishedDate ?? item.date ?? "")),
+    url: typeof item.url === "string" ? item.url : typeof item.link === "string" ? item.link : undefined
   }));
 }
 
@@ -401,7 +402,8 @@ async function getFinnhubNews(symbol: string) {
     summary: String(item.summary ?? "No summary available.").slice(0, 180),
     sentiment: "Neutral" as const,
     source: String(item.source ?? "Finnhub"),
-    time: formatRelativeTime(typeof item.datetime === "number" ? new Date(item.datetime * 1000).toISOString() : "")
+    time: formatRelativeTime(typeof item.datetime === "number" ? new Date(item.datetime * 1000).toISOString() : ""),
+    url: typeof item.url === "string" ? item.url : undefined
   }));
 }
 

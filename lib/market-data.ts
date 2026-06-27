@@ -25,6 +25,7 @@ export type NewsItem = {
   sentiment: "Positive" | "Neutral" | "Negative";
   source: string;
   time: string;
+  url?: string;
 };
 
 export type FundamentalItem = [string, string];
