@@ -82,7 +82,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
               <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
-          <MarketOverviewCard items={data.overview} />
+          <MarketOverviewCard data={data} />
         </section>
 
         <section className="space-y-4">
