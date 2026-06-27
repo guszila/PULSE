@@ -8,6 +8,7 @@ import { NewsCard } from "@/components/stock/news-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatCompact } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { GlobalSearch } from "@/components/shared/global-search";
 
 export const revalidate = 300;
 
@@ -20,6 +21,9 @@ export default async function StockSymbolPage({ params }: { params: Promise<{ sy
 
   return (
     <>
+      <div className="mt-2 mb-4">
+        <GlobalSearch />
+      </div>
       <section id="stock" className="mt-4 grid gap-3 xl:grid-cols-[1fr_380px]">
         <Card className="min-w-0">
           <CardHeader className="flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
