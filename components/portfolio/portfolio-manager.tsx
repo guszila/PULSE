@@ -21,6 +21,8 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
   const [showDropdown, setShowDropdown] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [addedStock, setAddedStock] = useState<PortfolioPosition | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,23 +171,25 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
     
     if (!error && data) {
       setPositions([...positions, { ...data, current_price: data.average_cost, previous_close: data.average_cost, total_value: data.shares * data.average_cost, day_gain: 0, day_gain_percent: 0, total_return: 0, total_return_percent: 0 } as any]);
+      setAddedStock(data as any);
       setSymbol("");
       setShares("");
       setCost("");
-      window.location.reload();
+      setIsAdding(false);
     } else {
       console.error(error);
     }
     setBusy(false);
   }
 
-  async function handleDelete(id: string) {
+  async function confirmDelete() {
+    if (!deleteConfirmId) return;
     setBusy(true);
-    const { error } = await supabase.from("positions").delete().eq("id", id);
+    const { error } = await supabase.from("positions").delete().eq("id", deleteConfirmId);
     if (!error) {
-      setPositions(positions.filter(p => p.id !== id));
-      window.location.reload();
+      setPositions(positions.filter(p => p.id !== deleteConfirmId));
     }
+    setDeleteConfirmId(null);
     setBusy(false);
   }
 
@@ -337,7 +341,7 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} 
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(p.id); }} 
                           disabled={busy} 
                           className="absolute right-2 h-8 w-8 rounded-full text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-400 transition-all focus:opacity-100 bg-black/50 backdrop-blur-md border border-white/10"
                         >
@@ -487,6 +491,68 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
           </div>
         </div>
       </CardContent>
+
+      {/* Success Modal */}
+      {addedStock && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col items-center text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
+            <div className="h-20 w-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-5 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] relative">
+              <StockLogo symbol={addedStock.symbol} className="h-12 w-12 rounded-full absolute" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">เพิ่มหุ้นสำเร็จ!</h3>
+            <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+              คุณได้เพิ่ม <span className="font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded text-base">{addedStock.symbol}</span><br/>จำนวน <span className="text-white font-medium">{addedStock.shares}</span> หุ้น เข้าสู่พอร์ตของคุณเรียบร้อยแล้ว
+            </p>
+            <Button 
+              onClick={() => setAddedStock(null)}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl h-12 shadow-[0_4px_14px_0_rgb(16,185,129,0.39)] transition-all"
+            >
+              ตกลง
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (() => {
+        const stockToDelete = positions.find(p => p.id === deleteConfirmId);
+        if (!stockToDelete) return null;
+        
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-rose-500" />
+              <div className="flex justify-center mb-5">
+                <div className="h-16 w-16 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.15)]">
+                  <Trash2 className="h-7 w-7" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2 text-center">ยืนยันการลบหุ้น?</h3>
+              <p className="text-zinc-400 text-sm mb-7 text-center leading-relaxed">
+                คุณแน่ใจหรือไม่ว่าต้องการลบ <span className="font-bold text-rose-400 bg-rose-400/10 px-1.5 py-0.5 rounded">{stockToDelete.symbol}</span> จำนวน <span className="text-white font-medium">{stockToDelete.shares}</span> หุ้น ออกจากพอร์ต? <br/><span className="text-xs text-zinc-500 mt-2 block">การกระทำนี้ไม่สามารถยกเลิกได้</span>
+              </p>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 rounded-xl h-12 border-white/10 text-white hover:bg-white/5 bg-transparent"
+                  disabled={busy}
+                >
+                  ยกเลิก
+                </Button>
+                <Button 
+                  onClick={confirmDelete}
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl h-12 shadow-[0_4px_14px_0_rgb(244,63,94,0.39)] transition-all"
+                  disabled={busy}
+                >
+                  {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "ลบหุ้น"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </Card>
   );
 }

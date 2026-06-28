@@ -1,3 +1,4 @@
+import yahooFinance from "./yahoo-finance";
 import {
   candleData as fallbackCandleData,
   fallbackDashboardData,
@@ -125,36 +126,35 @@ function finiteNumber(value: unknown): number | null {
 }
 
 async function getCandles(symbol: string): Promise<ProviderResult<CandlePoint[]>> {
-  const twelveDataKey = process.env.TWELVE_DATA_API_KEY;
-  if (!twelveDataKey) {
-    return { data: fallbackCandleData, source: "Mock fallback", live: false };
-  }
-
-  const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=220&apikey=${twelveDataKey}`;
-  const data = await fetchJson<{ values?: Array<Record<string, unknown>> }>(url, 900);
-  const values = data?.values;
-
-  if (!values || values.length < 10) {
-    return { data: fallbackCandleData, source: "Mock fallback", live: false };
-  }
-
-  const rows = values
-    .slice()
-    .reverse()
-    .map((item, index) => ({
+  try {
+    const period1 = new Date();
+    period1.setDate(period1.getDate() - 300); // 300 days for 200 EMA
+    
+    const queryOptions = { period1: period1, interval: '1d' as const };
+    const chartResult = (await yahooFinance.chart(symbol, queryOptions)) as any;
+    const result = chartResult.quotes || [];
+    
+    if (!result || result.length < 10) {
+      return { data: fallbackCandleData, source: "Mock fallback", live: false };
+    }
+    
+    const rows = result.map((item: any, index: number) => ({
       x: index,
-      time: typeof item.datetime === "string" ? item.datetime.slice(0, 10) : undefined,
-      open: finiteNumber(item.open) ?? 0,
-      high: finiteNumber(item.high) ?? 0,
-      low: finiteNumber(item.low) ?? 0,
-      close: finiteNumber(item.close) ?? 0,
-      volume: finiteNumber(item.volume) ?? 0
-    }))
-    .filter((item) => item.open > 0 && item.high > 0 && item.low > 0 && item.close > 0);
+      time: item.date.toISOString().slice(0, 10),
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+      volume: item.volume
+    })).filter((item: any) => item.open > 0 && item.high > 0 && item.low > 0 && item.close > 0);
 
-  return rows.length >= 10
-    ? { data: rows, source: "Twelve Data", live: true }
-    : { data: fallbackCandleData, source: "Mock fallback", live: false };
+    return rows.length >= 10
+      ? { data: rows, source: "Yahoo Finance", live: true }
+      : { data: fallbackCandleData, source: "Mock fallback", live: false };
+  } catch (error) {
+    console.error("Error fetching candles:", error);
+    return { data: fallbackCandleData, source: "Mock fallback", live: false };
+  }
 }
 
 function getSelectedStock(symbol: string, watchlist: WatchlistStock[], candles: CandlePoint[]): SelectedStock {
@@ -184,246 +184,136 @@ function getSelectedStock(symbol: string, watchlist: WatchlistStock[], candles: 
 
 async function getWatchlist(customSymbols?: string[]): Promise<ProviderResult<WatchlistStock[]>> {
   const symbolsToFetch = customSymbols?.length ? customSymbols : WATCHLIST_SYMBOLS;
-  const finnhubKey = getFinnhubApiKey();
-  if (!finnhubKey) {
+  try {
+    const quotes = await Promise.allSettled(
+      symbolsToFetch.map(async (symbol) => {
+        return yahooFinance.quote(symbol);
+      })
+    );
+
+    const rows = quotes.map((result, i) => {
+      const symbol = symbolsToFetch[i];
+      if (result.status === 'fulfilled' && result.value) {
+        const quote = result.value as any;
+        const price = quote.regularMarketPrice;
+        if (!price || price <= 0) return null;
+        
+        return {
+          symbol,
+          company: quote.longName || quote.shortName || symbol,
+          price,
+          change: quote.regularMarketChangePercent ?? 0,
+          volume: quote.regularMarketVolume ?? 0,
+          marketCap: quote.marketCap ?? 0
+        };
+      }
+      return fallbackWatchlist.find((stock) => stock.symbol === symbol) || null;
+    }).filter(Boolean) as WatchlistStock[];
+    
+    return { data: rows, source: "Yahoo Finance", live: true };
+  } catch(error) {
     return { data: fallbackWatchlist, source: "Mock fallback", live: false };
   }
-
-  const quotes = await Promise.all(
-    symbolsToFetch.map(async (symbol) => ({
-      symbol,
-      quote: await fetchFinnhubQuote(symbol, finnhubKey)
-    }))
-  );
-
-  const rows = quotes
-    .map(({ symbol, quote }) => {
-      const fallback = fallbackWatchlist.find((stock) => stock.symbol === symbol);
-      const price = finiteNumber(quote?.c);
-      if (!quote || price === null || price <= 0) {
-        return fallback || null;
-      }
-
-      return {
-        symbol,
-        company: fallback?.company || symbol,
-        price,
-        change: finiteNumber(quote.dp) ?? (fallback?.change || 0),
-        volume: fallback?.volume || 0,
-        marketCap: fallback?.marketCap || 0
-      };
-    })
-    .filter(Boolean) as WatchlistStock[];
-
-  const liveCount = rows.filter(
-    (row) => row.price !== fallbackWatchlist.find((stock) => stock.symbol === row.symbol)?.price
-  ).length;
-
-  return liveCount > 0
-    ? { data: rows, source: "Finnhub", live: true }
-    : { data: fallbackWatchlist, source: "Mock fallback", live: false };
 }
 
 async function getMarketOverview(): Promise<ProviderResult<MarketOverviewItem[]>> {
-  const finnhubKey = getFinnhubApiKey();
-  if (!finnhubKey) {
-    return { data: fallbackMarketOverview, source: "Mock fallback", live: false };
-  }
-
   const labels = [
-    { symbol: "SPY", name: "S&P 500" },
-    { symbol: "QQQ", name: "NASDAQ" },
-    { symbol: "GLD", name: "Gold" },
-    { symbol: "USO", name: "Crude Oil" }
+    { symbol: "^GSPC", name: "S&P 500" },
+    { symbol: "^IXIC", name: "NASDAQ" },
+    { symbol: "GC=F", name: "Gold" },
+    { symbol: "CL=F", name: "Crude Oil" }
   ];
 
-  const quotes = await Promise.all(
-    labels.map(async (item) => ({
-      ...item,
-      quote: await fetchFinnhubQuote(item.symbol, finnhubKey)
-    }))
-  );
+  try {
+    const quotes = await Promise.allSettled(
+      labels.map((item) => yahooFinance.quote(item.symbol))
+    );
 
-  const mappedRows = quotes.map(({ name, quote }) => {
-    const fallback = fallbackMarketOverview.find((item) => item.name === name);
-    const price = finiteNumber(quote?.c);
-    const hasLivePrice = price !== null && price > 0;
-    return {
-      row: {
-        name,
-        value: hasLivePrice ? price.toFixed(2) : fallback?.value ?? "0",
-        change: finiteNumber(quote?.dp) ?? fallback?.change ?? 0
-      },
-      hasLivePrice
-    };
-  });
-
-  const rows = mappedRows.map((item) => item.row);
-  const hasLiveOverview = mappedRows.some((item) => item.hasLivePrice);
-
-  return hasLiveOverview
-    ? {
-        data: rows,
-        source: "Finnhub",
-        live: true
+    const rows = quotes.map((result, index) => {
+      const labelItem = labels[index];
+      const fallback = fallbackMarketOverview.find((item) => item.name === labelItem.name);
+      
+      if (result.status === 'fulfilled' && result.value) {
+        const quote = result.value as any;
+        const price = quote.regularMarketPrice;
+        if (price !== undefined && price > 0) {
+           return {
+             name: labelItem.name,
+             value: price.toFixed(2),
+             change: quote.regularMarketChangePercent ?? 0
+           };
+        }
       }
-    : { data: fallbackMarketOverview, source: "Mock fallback", live: false };
-}
+      
+      return {
+        name: labelItem.name,
+        value: fallback?.value ?? "0",
+        change: fallback?.change ?? 0
+      };
+    });
 
-export async function fetchFinnhubQuote(symbol: string, token: string) {
-  const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
-  return fetchJson<FinnhubQuote>(url, 300);
-}
-
-export function getFinnhubApiKey() {
-  return process.env.FINNHUB_API_KEY || process.env.TWELVE_DATA_API_KEY;
+    return { data: rows, source: "Yahoo Finance", live: true };
+  } catch(e) {
+    return { data: fallbackMarketOverview, source: "Mock fallback", live: false };
+  }
 }
 
 async function getFundamentals(symbol: string): Promise<ProviderResult<FundamentalItem[]>> {
-  const fmpKey = process.env.FMP_API_KEY;
-  if (!fmpKey) {
+  try {
+    const queryOptions = { modules: ['financialData', 'defaultKeyStatistics', 'summaryDetail'] as const };
+    const quoteSummary = (await yahooFinance.quoteSummary(symbol, queryOptions)) as any;
+    
+    const fd = quoteSummary.financialData || {};
+    const dks = quoteSummary.defaultKeyStatistics || {};
+    const sd = quoteSummary.summaryDetail || {};
+    
+    const fallbackMap = new Map(fallbackFundamentals);
+    
+    const rows: FundamentalItem[] = [
+      ["มูลค่าตลาด", formatCompactCurrency(sd.marketCap) || fallbackMap.get("มูลค่าตลาด") || "N/A"],
+      ["PE", formatPositiveRatio(sd.trailingPE) || fallbackMap.get("PE") || "N/A"],
+      ["Forward PE", formatPositiveRatio(sd.forwardPE) || fallbackMap.get("Forward PE") || "N/A"],
+      ["PEG", formatPositiveRatio(dks.pegRatio) || fallbackMap.get("PEG") || "N/A"],
+      ["EPS", formatPositiveCurrency(dks.trailingEps) || fallbackMap.get("EPS") || "N/A"],
+      ["รายได้", formatCompactCurrency(fd.totalRevenue) || fallbackMap.get("รายได้") || "N/A"],
+      ["อัตรากำไรขั้นต้น", formatPercent(fd.grossMargins) || fallbackMap.get("อัตรากำไรขั้นต้น") || "N/A"],
+      ["อัตรากำไรดำเนินงาน", formatPercent(fd.operatingMargins) || fallbackMap.get("อัตรากำไรดำเนินงาน") || "N/A"],
+      ["อัตรากำไรสุทธิ", formatPercent(fd.profitMargins) || fallbackMap.get("อัตรากำไรสุทธิ") || "N/A"],
+      ["ROE", formatPercent(fd.returnOnEquity) || fallbackMap.get("ROE") || "N/A"],
+      ["ROA", formatPercent(fd.returnOnAssets) || fallbackMap.get("ROA") || "N/A"],
+      ["หนี้สินต่อทุน", formatRatio(fd.debtToEquity ? fd.debtToEquity / 100 : null) || fallbackMap.get("หนี้สินต่อทุน") || "N/A"],
+      ["กระแสเงินสดอิสระ", formatCompactCurrency(fd.freeCashflow) || fallbackMap.get("กระแสเงินสดอิสระ") || "N/A"],
+      ["เงินปันผลตอบแทน", formatPercent(sd.dividendYield) || fallbackMap.get("เงินปันผลตอบแทน") || "N/A"]
+    ];
+
+    return { data: rows, source: "Yahoo Finance", live: true };
+  } catch(error) {
     return { data: fallbackFundamentals, source: "Mock fallback", live: false };
   }
-
-  const [quote, profile, ratios, metrics] = await Promise.all([
-    fetchFmp<Array<Record<string, unknown>>>(`quote?symbol=${symbol}`, fmpKey, 1800),
-    fetchFmp<Array<Record<string, unknown>>>(`profile?symbol=${symbol}`, fmpKey, 3600),
-    fetchFmp<Array<Record<string, unknown>>>(`ratios-ttm?symbol=${symbol}`, fmpKey, 3600),
-    fetchFmp<Array<Record<string, unknown>>>(`key-metrics-ttm?symbol=${symbol}`, fmpKey, 3600)
-  ]);
-
-  const quoteRow = quote?.[0];
-  const profileRow = profile?.[0];
-  const ratioRow = ratios?.[0];
-  const metricRow = metrics?.[0];
-  if (!quoteRow && !profileRow && !ratioRow && !metricRow) {
-    return { data: fallbackFundamentals, source: "Mock fallback", live: false };
-  }
-
-  const fallbackMap = new Map(fallbackFundamentals);
-  const rows: FundamentalItem[] = [
-    ["มูลค่าตลาด", formatCompactCurrency(readField(profileRow, quoteRow, "marketCap", "mktCap")) || fallbackMap.get("มูลค่าตลาด") || "N/A"],
-    ["PE", formatPositiveRatio(readField(quoteRow, profileRow, "pe", "peRatioTTM")) || fallbackMap.get("PE") || "N/A"],
-    ["Forward PE", fallbackMap.get("Forward PE") || "N/A"],
-    ["PEG", formatPositiveRatio(readField(ratioRow, "priceEarningsToGrowthRatioTTM", "pegRatioTTM")) || fallbackMap.get("PEG") || "N/A"],
-    ["EPS", formatPositiveCurrency(readField(quoteRow, profileRow, "eps", "epsTTM")) || fallbackMap.get("EPS") || "N/A"],
-    [
-      "รายได้",
-      formatCompactCurrency(readField(metricRow, profileRow, "revenuePerShareTTM", "revenueTTM")) ||
-        fallbackMap.get("รายได้") ||
-        "N/A"
-    ],
-    ["อัตรากำไรขั้นต้น", formatPercent(readField(ratioRow, "grossProfitMarginTTM", "grossMarginTTM")) || fallbackMap.get("อัตรากำไรขั้นต้น") || "N/A"],
-    [
-      "อัตรากำไรดำเนินงาน",
-      formatPercent(readField(ratioRow, "operatingProfitMarginTTM", "operatingMarginTTM")) ||
-        fallbackMap.get("อัตรากำไรดำเนินงาน") ||
-        "N/A"
-    ],
-    ["อัตรากำไรสุทธิ", formatPercent(readField(ratioRow, "netProfitMarginTTM", "netMarginTTM")) || fallbackMap.get("อัตรากำไรสุทธิ") || "N/A"],
-    ["ROE", formatPercent(readField(ratioRow, "returnOnEquityTTM", "roeTTM")) || fallbackMap.get("ROE") || "N/A"],
-    ["ROA", formatPercent(readField(ratioRow, "returnOnAssetsTTM", "roaTTM")) || fallbackMap.get("ROA") || "N/A"],
-    ["หนี้สินต่อทุน", formatRatio(readField(ratioRow, "debtEquityRatioTTM", "debtToEquityTTM")) || fallbackMap.get("หนี้สินต่อทุน") || "N/A"],
-    [
-      "กระแสเงินสดอิสระ",
-      formatCompactCurrency(readField(metricRow, "freeCashFlowPerShareTTM", "freeCashFlowTTM")) ||
-        fallbackMap.get("กระแสเงินสดอิสระ") ||
-        "N/A"
-    ],
-    ["เงินปันผลตอบแทน", formatPercent(readField(ratioRow, "dividendYielTTM", "dividendYieldTTM")) || fallbackMap.get("เงินปันผลตอบแทน") || "N/A"]
-  ];
-
-  return { data: rows, source: "FMP", live: true };
 }
 
 async function getNews(symbol: string): Promise<ProviderResult<NewsItem[]>> {
-  const fmpKey = process.env.FMP_API_KEY;
-  if (fmpKey) {
-    const data =
-      (await fetchFmp<Array<Record<string, unknown>>>(`news/stock?symbols=${symbol}&page=0&limit=3`, fmpKey, 900)) ??
-      (await fetchFmp<Array<Record<string, unknown>>>("news/stock-latest?page=0&limit=20", fmpKey, 900));
-    const rows = mapFmpNews(symbol, data);
-
-    if (rows.length > 0) {
-      return { data: rows, source: "FMP", live: true };
+  try {
+    const result = (await yahooFinance.search(symbol, { newsCount: 3 })) as any;
+    const news = result.news || [];
+    
+    if (news.length === 0) {
+      return { data: fallbackNews, source: "Mock fallback", live: false };
     }
+    
+    const rows = news.slice(0,3).map((item: any) => ({
+      headline: String(item.title ?? "Market update"),
+      summary: "See full article for details.",
+      sentiment: "Neutral" as const,
+      source: String(item.publisher ?? "Yahoo Finance"),
+      time: formatRelativeTime(item.providerPublishTime ? new Date(item.providerPublishTime * 1000).toISOString() : ""),
+      url: item.link
+    }));
+
+    return { data: rows, source: "Yahoo Finance", live: true };
+  } catch(error) {
+    return { data: fallbackNews, source: "Mock fallback", live: false };
   }
-
-  const finnhubRows = await getFinnhubNews(symbol);
-  if (finnhubRows.length > 0) {
-    return { data: finnhubRows, source: "Finnhub", live: true };
-  }
-
-  return { data: fallbackNews, source: "Mock fallback", live: false };
-}
-
-function mapFmpNews(symbol: string, data: Array<Record<string, unknown>> | null) {
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  const symbolNews = data.filter((item) => {
-    const symbols = String(item.symbols ?? item.symbol ?? item.ticker ?? "");
-    return symbols.length === 0 || symbols.toUpperCase().includes(symbol);
-  });
-
-  return (symbolNews.length > 0 ? symbolNews : data).slice(0, 3).map((item) => ({
-    headline: String(item.title ?? "Market update"),
-    summary: String(item.text ?? item.snippet ?? item.summary ?? "No summary available.").slice(0, 180),
-    sentiment: "Neutral" as const,
-    source: String(item.site ?? item.publisher ?? item.source ?? "FMP"),
-    time: formatRelativeTime(String(item.publishedDate ?? item.date ?? "")),
-    url: typeof item.url === "string" ? item.url : typeof item.link === "string" ? item.link : undefined
-  }));
-}
-
-async function getFinnhubNews(symbol: string) {
-  const finnhubKey = getFinnhubApiKey();
-  if (!finnhubKey) {
-    return [];
-  }
-
-  const to = new Date();
-  const from = new Date(to);
-  from.setDate(to.getDate() - 14);
-
-  const data = await fetchJson<Array<Record<string, unknown>>>(
-    `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${formatDate(from)}&to=${formatDate(to)}&token=${finnhubKey}`,
-    900
-  );
-
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  return data.slice(0, 3).map((item) => ({
-    headline: String(item.headline ?? "Market update"),
-    summary: String(item.summary ?? "No summary available.").slice(0, 180),
-    sentiment: "Neutral" as const,
-    source: String(item.source ?? "Finnhub"),
-    time: formatRelativeTime(typeof item.datetime === "number" ? new Date(item.datetime * 1000).toISOString() : ""),
-    url: typeof item.url === "string" ? item.url : undefined
-  }));
-}
-
-function fetchFmp<T>(path: string, apiKey: string, revalidate: number) {
-  const joiner = path.includes("?") ? "&" : "?";
-  return fetchJson<T>(`https://financialmodelingprep.com/stable/${path}${joiner}apikey=${apiKey}`, revalidate);
-}
-
-function readField(...args: Array<Record<string, unknown> | string | undefined>) {
-  const records = args.filter((arg): arg is Record<string, unknown> => Boolean(arg) && typeof arg === "object");
-  const fields = args.filter((arg): arg is string => typeof arg === "string");
-
-  for (const record of records) {
-    for (const field of fields) {
-      if (record[field] !== undefined && record[field] !== null) {
-        return record[field];
-      }
-    }
-  }
-
-  return null;
 }
 
 async function getMacro(): Promise<ProviderResult<MacroItem[]>> {

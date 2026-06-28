@@ -1,7 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { portfolioMetrics as fallbackMetrics, allocation as fallbackAllocation } from "@/lib/market-data";
-import { getFinnhubApiKey, fetchFinnhubQuote } from "@/lib/free-market-api";
-
+import yahooFinance from "./yahoo-finance";
 export type PortfolioPosition = {
   id: string;
   symbol: string;
@@ -73,11 +72,6 @@ export async function getPortfolio(): Promise<PortfolioData> {
       return { metrics: emptyMetrics, allocation: [], positions: [], isLive: true };
     }
 
-    const finnhubKey = getFinnhubApiKey();
-    if (!finnhubKey) {
-      return { metrics: fallbackMetrics as any, allocation: fallbackAllocation as any, positions: [], isLive: false };
-    }
-
     let totalValue = 0;
     let totalCost = 0;
     let dayGainTotal = 0;
@@ -86,9 +80,14 @@ export async function getPortfolio(): Promise<PortfolioData> {
 
     const positions: PortfolioPosition[] = await Promise.all(
       positionsData.map(async (pos) => {
-        const quote = await fetchFinnhubQuote(pos.symbol, finnhubKey);
-        const currentPrice = quote?.c ?? pos.average_cost;
-        const previousClose = quote?.pc ?? pos.average_cost;
+        let quote: any;
+        try {
+          quote = await yahooFinance.quote(pos.symbol);
+        } catch (e) {
+          console.error(e);
+        }
+        const currentPrice = quote?.regularMarketPrice ?? pos.average_cost;
+        const previousClose = quote?.regularMarketPreviousClose ?? pos.average_cost;
         
         const value = currentPrice * pos.shares;
         const cost = pos.average_cost * pos.shares;

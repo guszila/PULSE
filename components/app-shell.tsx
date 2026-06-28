@@ -81,9 +81,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setAssistantOpen(true)} aria-label="Open AI sidebar">
               <Bot className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
-              <Menu className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>
@@ -158,7 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </section>
 
-      <MobileBottomNav pathname={pathname} />
+      <MobileBottomNav pathname={pathname} onMenuClick={() => setMobileNavOpen(true)} />
 
       <Button
         onClick={() => setAssistantOpen(true)}
@@ -188,8 +185,8 @@ function Brand() {
   );
 }
 
-function MobileBottomNav({ pathname }: { pathname: string }) {
-  const mobileItems = navItems.slice(0, 5);
+function MobileBottomNav({ pathname, onMenuClick }: { pathname: string, onMenuClick: () => void }) {
+  const mobileItems = navItems.slice(0, 4);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#070807]/95 px-1.5 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1.5 backdrop-blur-2xl lg:hidden">
@@ -213,6 +210,13 @@ function MobileBottomNav({ pathname }: { pathname: string }) {
             </Link>
           );
         })}
+        <button
+          onClick={onMenuClick}
+          className="flex h-[46px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[9px] font-medium leading-none transition text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-100"
+        >
+          <Menu className="h-4 w-4 shrink-0" />
+          <span className="max-w-full truncate">เมนู</span>
+        </button>
       </div>
     </nav>
   );

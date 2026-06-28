@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFinnhubApiKey, fetchFinnhubQuote } from "@/lib/free-market-api";
+import yahooFinance from "../../../lib/yahoo-finance";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,18 +9,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
   }
 
-  const token = getFinnhubApiKey();
-  if (!token) {
-    return NextResponse.json({ error: "API key missing" }, { status: 500 });
-  }
-
   try {
-    const quote = await fetchFinnhubQuote(symbol, token);
-    if (!quote || quote.c === undefined) {
+    const quote = (await yahooFinance.quote(symbol)) as any;
+    if (!quote || quote.regularMarketPrice === undefined) {
       return NextResponse.json({ error: "Quote not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ price: quote.c });
+    return NextResponse.json({ price: quote.regularMarketPrice });
   } catch (error) {
     console.error("Quote API Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

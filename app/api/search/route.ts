@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFinnhubApiKey } from "@/lib/free-market-api";
+import yahooFinance from "../../../lib/yahoo-finance";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,39 +9,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ result: [] });
   }
 
-  const token = getFinnhubApiKey();
-  if (!token) {
-    return NextResponse.json({ result: [] });
-  }
-
   try {
-    const res = await fetch(`https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${token}`, {
-      next: { revalidate: 86400 } // Cache search results for a day
-    });
+    const result = (await yahooFinance.search(query, { quotesCount: 6, newsCount: 0 })) as any;
+    const rawQuotes = result.quotes || [];
     
-    if (!res.ok) {
-      return NextResponse.json({ result: [] });
-    }
-
-    const data = await res.json();
-    
-    // Filter to prioritize common US stocks and avoid complex derivatives/foreign exchanges
-    const rawResults = (data.result || [])
-      .filter((item: any) => !item.symbol.includes(".") && !item.symbol.includes(":"));
-      
-    // Deduplicate by symbol
-    const uniqueSymbols = new Set<string>();
-    const results = rawResults
-      .filter((item: any) => {
-        const sym = item.displaySymbol || item.symbol;
-        if (uniqueSymbols.has(sym)) return false;
-        uniqueSymbols.add(sym);
-        return true;
-      })
+    const results = rawQuotes
+      .filter((item: any) => item.isYahooFinance)
       .slice(0, 6)
       .map((item: any) => ({
-        symbol: item.displaySymbol || item.symbol,
-        name: item.description
+        symbol: item.symbol,
+        name: item.shortname || item.longname || item.symbol
       }));
 
     return NextResponse.json({ result: results });

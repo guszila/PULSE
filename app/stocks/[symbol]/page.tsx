@@ -3,7 +3,6 @@ import { getUserWatchlistSymbols } from "@/lib/watchlist-server";
 import { DecisionPlanCard } from "@/components/stock/decision-plan-card";
 import { TechnicalPanel } from "@/components/stock/technical-panel";
 import { FundamentalsCard } from "@/components/stock/fundamentals-card";
-import { NewsCard } from "@/components/stock/news-card";
 import { StockChartSection } from "@/components/stock/stock-chart-section";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
@@ -45,9 +44,8 @@ export default async function StockSymbolPage({ params }: { params: Promise<{ sy
         </div>
       </section>
       
-      <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_420px]">
+      <div className="mt-3">
         <FundamentalsCard items={data.fundamentals} />
-        <NewsCard items={data.news} />
       </div>
     </>
   );
