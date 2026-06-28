@@ -52,9 +52,6 @@ export function LoginClient() {
       setMessage(error.message);
     } else {
       setIsError(false);
-      if (data.session?.access_token) {
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
-      }
       router.push("/");
       router.refresh();
     }
@@ -86,7 +83,6 @@ export function LoginClient() {
     } else {
        setIsError(false);
        if (data.session?.access_token) {
-          document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
           router.push("/");
           router.refresh();
        } else {

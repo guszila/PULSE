@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
-import { cookies } from "next/headers";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const prompt = Prompt({
   weight: ["300", "400", "500", "600", "700"],
@@ -37,13 +37,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
     <html lang="th" suppressHydrationWarning>
       <body className={`${prompt.variable} font-sans antialiased bg-[#070807]`}>
-        {token ? (
+        {user ? (
           <AppShell>{children}</AppShell>
         ) : (
           <div className="min-h-screen theme-dark text-zinc-100">
