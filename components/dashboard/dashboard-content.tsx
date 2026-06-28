@@ -1,4 +1,5 @@
 import { DecisionHero } from "@/components/dashboard/decision-hero";
+import { AiInsightCard } from "@/components/dashboard/ai-insight-card";
 import { MarketOverviewCard } from "@/components/dashboard/market-overview-card";
 import { NewsCard } from "@/components/stock/news-card";
 import { SectionTitle } from "@/components/shared/section-title";
@@ -16,14 +17,16 @@ export async function DashboardContent({ symbol, userSymbols }: DashboardContent
 
   return (
     <>
-      <section className="mt-4 sm:mt-6">
+      <section className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
         <DecisionHero
           decision={data.decision}
           selectedStock={data.selectedStock}
           supportResistance={data.supportResistance}
           watchlist={data.watchlist}
           updatedAt={data.updatedAt}
+          data={data}
         />
+        <AiInsightCard data={data} />
       </section>
 
       <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 xl:grid-cols-[1.05fr_0.95fr]">

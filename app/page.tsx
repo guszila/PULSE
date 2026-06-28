@@ -8,11 +8,17 @@ import { Suspense } from "react";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 
+import { SymbolTracker } from "@/components/shared/symbol-tracker";
+import { cookies } from "next/headers";
+
 export const revalidate = 300;
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
   const resolvedParams = await searchParams;
-  const symbol = resolvedParams.symbol?.toUpperCase() || "AAPL";
+  const cookieStore = await cookies();
+  const savedSymbol = cookieStore.get("pulse-symbol")?.value;
+  const symbol = resolvedParams.symbol?.toUpperCase() || savedSymbol || "AAPL";
+  
   const supabase = await createSupabaseServerClient();
   const [, userSymbols] = await Promise.all([
     supabase.auth.getUser(),
@@ -52,6 +58,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
       </header>
 
       <Suspense fallback={<DashboardSkeleton />}>
+        <SymbolTracker symbol={symbol} />
         <DashboardContent symbol={symbol} userSymbols={userSymbols} />
       </Suspense>
     </>

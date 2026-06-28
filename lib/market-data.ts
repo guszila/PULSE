@@ -142,9 +142,8 @@ export const watchlist: WatchlistStock[] = [
 export const marketOverview: MarketOverviewItem[] = [
   { name: "S&P 500", value: "5,912.40", change: 0.64 },
   { name: "NASDAQ", value: "18,742.18", change: 0.92 },
-  { name: "Dow Jones", value: "42,188.20", change: 0.28 },
-  { name: "Russell 2000", value: "2,238.91", change: -0.18 },
-  { name: "VIX", value: "14.82", change: -3.41 }
+  { name: "Gold", value: "2,050.10", change: 0.15 },
+  { name: "Crude Oil", value: "82.40", change: -1.20 }
 ];
 
 export const sectors = [

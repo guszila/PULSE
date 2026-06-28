@@ -1,28 +1,86 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, Target, ShieldCheck, ChevronDown, Activity, ShieldAlert, Zap, BarChart2 } from "lucide-react";
+import { TrendingUp, Target, ShieldCheck, ChevronDown, Activity, ShieldAlert, Zap, BarChart2, Sparkles, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { DecisionSnapshot, SelectedStock, SupportResistanceData, WatchlistStock } from "@/lib/market-data";
+import { Button } from "@/components/ui/button";
+import type { DecisionSnapshot, SelectedStock, SupportResistanceData, WatchlistStock, AlphaEdgeDashboardData } from "@/lib/market-data";
 import { thaiAction, thaiBias, thaiConfidence, thaiRisk, formatUpdatedAt, thaiVolume } from "@/lib/formatters";
 
 export function DecisionHero({
-  decision,
+  decision: initialDecision,
   selectedStock,
-  supportResistance,
+  supportResistance: initialSupportResistance,
   updatedAt,
-  watchlist
+  watchlist,
+  data
 }: {
   decision: DecisionSnapshot;
   selectedStock: SelectedStock;
   supportResistance: SupportResistanceData;
   updatedAt: string;
   watchlist: WatchlistStock[];
+  data: AlphaEdgeDashboardData;
 }) {
   const router = useRouter();
   
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [aiData, setAiData] = useState<any>(null);
+  
+  const handleUseAi = async () => {
+    setLoadingAi(true);
+    try {
+      const apiKey = window.localStorage.getItem("alphaedge-gemini-key") || "";
+      const res = await fetch("/api/decision-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-gemini-key": apiKey },
+        body: JSON.stringify({ data })
+      });
+      const json = await res.json();
+      if (res.ok && json.result) {
+        setAiData(json.result);
+      } else {
+        alert(json.error || "Failed to analyze with AI");
+      }
+    } catch (e) {
+      alert("Error calling AI");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const decision = useMemo(() => {
+    if (aiData) {
+      return {
+        ...initialDecision,
+        score: aiData.score,
+        bias: aiData.bias,
+        riskLevel: aiData.riskLevel,
+        actionLabel: aiData.actionLabel
+      };
+    }
+    return initialDecision;
+  }, [initialDecision, aiData]);
+
+  const supportResistance = useMemo(() => {
+    if (aiData) {
+      return {
+        ...initialSupportResistance,
+        support: aiData.support,
+        strongSupport: aiData.strongSupport,
+        resistance: aiData.resistance,
+        strongResistance: aiData.strongResistance,
+        suggestedEntry: aiData.suggestedEntry,
+        stopLoss: aiData.stopLoss,
+        takeProfit: aiData.takeProfit,
+        riskReward: aiData.riskReward
+      };
+    }
+    return initialSupportResistance;
+  }, [initialSupportResistance, aiData]);
+
   const riskTone = decision.riskLevel.includes("High") || decision.riskLevel.includes("สูง") 
     ? "loss" 
     : decision.riskLevel.includes("Medium") || decision.riskLevel.includes("ปานกลาง") 
@@ -31,18 +89,26 @@ export function DecisionHero({
 
   return (
     <section id="decision" className="grid gap-3 xl:grid-cols-[1fr_360px]">
-      <Card className="overflow-hidden border-teal-500/20 bg-[linear-gradient(135deg,rgba(20,184,166,0.1),rgba(245,158,11,0.05)_42%,rgba(0,0,0,0))] shadow-glass">
+      <Card className="relative overflow-hidden border-teal-500/20 bg-[linear-gradient(135deg,rgba(20,184,166,0.1),rgba(245,158,11,0.05)_42%,rgba(0,0,0,0))] shadow-glass">
+        {aiData && (
+          <div className="absolute top-0 right-0 p-3 flex items-center gap-1.5 opacity-60">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="text-[10px] font-bold text-amber-400 tracking-wider">AI POWERED</span>
+          </div>
+        )}
         <CardContent className="pt-4 sm:pt-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <Badge tone={decision.bias === "Bullish" ? "gain" : decision.bias === "Bearish" ? "loss" : "neutral"} className="px-2.5 py-1">
                   <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
-                  {thaiBias(decision.bias)}
+                  {aiData ? (decision.bias === "Bullish" ? "แนวโน้มดี" : decision.bias === "Bearish" ? "เอนเอียงลบ" : "ทรงตัว") : thaiBias(decision.bias)}
                 </Badge>
-                <Badge tone="neutral" className="px-2.5 py-1 bg-white/[0.04]">
-                  ความมั่นใจ {thaiConfidence(decision.confidence)}
-                </Badge>
+                {!aiData && (
+                  <Badge tone="neutral" className="px-2.5 py-1 bg-white/[0.04]">
+                    ความมั่นใจ {thaiConfidence(decision.confidence)}
+                  </Badge>
+                )}
                 <span className="text-xs text-zinc-500">อัปเดต {formatUpdatedAt(updatedAt)}</span>
               </div>
               
@@ -66,38 +132,70 @@ export function DecisionHero({
                   </select>
                   <ChevronDown className="absolute right-2 h-5 w-5 text-zinc-400 pointer-events-none" />
                 </div>
-                <h2 className="text-xl font-medium tracking-tight text-zinc-300 sm:text-2xl mt-1">
-                  วันนี้ควรดูโซนแนวรับ-แนวต้าน
-                </h2>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <h2 className="text-xl font-medium tracking-tight text-zinc-300 sm:text-2xl mt-1">
+                    วันนี้ควรดูโซนแนวรับ-แนวต้าน
+                  </h2>
+                  {!aiData && (
+                    <Button 
+                      size="sm" 
+                      onClick={handleUseAi} 
+                      disabled={loadingAi}
+                      className="ml-auto sm:ml-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 h-8 text-xs font-semibold px-3 mt-1 shadow-lg shadow-orange-500/20"
+                    >
+                      {loadingAi ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                      ใช้ AI วิเคราะห์เจาะลึก
+                    </Button>
+                  )}
+                </div>
               </div>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
-                <strong className="text-zinc-200 font-semibold">สรุปง่าย ๆ:</strong> {thaiAction(decision.actionLabel)} ดูว่าราคายืนเหนือแนวรับได้ไหม และอย่าลืมกำหนดจุดตัดขาดทุนก่อนซื้อ
-              </p>
+              <div className="mt-4 max-w-2xl inline-flex items-start gap-2.5 rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3 shadow-glass backdrop-blur-sm">
+                {aiData ? (
+                  <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                ) : (
+                  <Target className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                )}
+                <div className="text-sm font-medium leading-relaxed text-zinc-200">
+                  <strong className={aiData ? "text-amber-400 font-bold mr-1" : "text-teal-400 font-bold mr-1"}>
+                    สรุปแผนการเล่น:
+                  </strong> 
+                  {aiData ? decision.actionLabel : thaiAction(decision.actionLabel)}
+                </div>
+              </div>
             </div>
             
             <div className="grid w-full grid-cols-3 gap-2 lg:w-[360px] shrink-0">
               <HeroStat icon={Activity} label="คะแนน" value={`${decision.score}/100`} tone="gain" />
-              <HeroStat icon={ShieldAlert} label="เสี่ยง" value={thaiRisk(decision.riskLevel)} tone={riskTone} />
+              <HeroStat icon={ShieldAlert} label="เสี่ยง" value={aiData ? (decision.riskLevel === "High" ? "สูง" : decision.riskLevel === "Medium" ? "ปานกลาง" : "ต่ำ") : thaiRisk(decision.riskLevel)} tone={riskTone} />
               <HeroStat icon={BarChart2} label="คุ้มเสี่ยง" value={supportResistance.riskReward} tone="gain" />
+              <div className="col-span-3 mt-2 rounded-2xl border border-blue-500/20 bg-blue-500/[0.04] p-3 relative overflow-hidden group hover:bg-blue-500/[0.08] transition-colors flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                   <Target className="w-5 h-5 text-blue-400" />
+                   <div>
+                     <div className="text-[11px] font-medium text-blue-300/80">ช่วงราคาที่น่าสนใจ (Entry)</div>
+                     <div className="text-sm font-bold text-blue-200">{supportResistance.suggestedEntry}</div>
+                   </div>
+                 </div>
+                 <div className="text-[10px] text-blue-300/60 text-right">
+                   ตัดขาดทุน: {supportResistance.stopLoss}<br/>
+                   เป้าทำกำไร: {supportResistance.takeProfit}
+                 </div>
+              </div>
             </div>
           </div>
           
-          <div className="mt-6 border-t border-white/[0.06] pt-6">
+          <div className="mt-6 border-t border-white/[0.06] pt-6 relative">
+            {loadingAi && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-sm rounded-xl">
+                <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
+                <p className="text-sm font-medium text-amber-200 animate-pulse">AI กำลังคำนวณ Volatility และ Volume Profile...</p>
+              </div>
+            )}
             <PricePositionBar supportResistance={supportResistance} />
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-white/[0.08] shadow-glass">
-        <CardHeader className="pb-3 pt-5">
-          <CardTitle className="text-base font-semibold text-zinc-200">แผนก่อนกดซื้อ</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <PlanRow icon={Target} label="จุดน่าสนใจ" value={supportResistance.suggestedEntry} tone="blue" />
-          <PlanRow icon={ShieldCheck} label="ตัดขาดทุน" value={supportResistance.stopLoss} tone="red" />
-          <PlanRow icon={TrendingUp} label="เป้าทำกำไร" value={supportResistance.takeProfit} tone="green" />
-        </CardContent>
-      </Card>
     </section>
   );
 }

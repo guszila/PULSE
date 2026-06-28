@@ -25,3 +25,12 @@ export async function getUserWatchlistSymbols(): Promise<string[] | undefined> {
 
   return undefined;
 }
+
+export async function getPinnedWatchlistSymbols(): Promise<string[]> {
+  const cookieStore = await cookies();
+  const currentCookie = cookieStore.get("alphaedge_pinned_watchlist")?.value;
+  if (currentCookie) {
+    return currentCookie.split(",").filter(Boolean);
+  }
+  return [];
+}

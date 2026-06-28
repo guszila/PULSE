@@ -17,7 +17,7 @@ export type PortfolioPosition = {
 };
 
 export type PortfolioData = {
-  metrics: { label: string; value: string; delta: string; tone: "gain" | "loss" | "neutral" }[];
+  metrics: { label: string; value: string; delta: string; tone: "gain" | "loss" | "neutral"; rawValue?: number }[];
   allocation: { name: string; value: number; color: string }[];
   positions: PortfolioPosition[];
   isLive: boolean;
@@ -66,11 +66,9 @@ export async function getPortfolio(): Promise<PortfolioData> {
 
     if (positionsData.length === 0) {
       const emptyMetrics: PortfolioData["metrics"] = [
-        { label: "มูลค่าพอร์ต", value: "$0.00", delta: "0%", tone: "neutral" },
-        { label: "กำไร/ขาดทุนวันนี้", value: "$0.00", delta: "0%", tone: "neutral" },
-        { label: "ผลตอบแทนรวม", value: "$0.00", delta: "0%", tone: "neutral" },
-        { label: "เงินสดสำรอง", value: "$0.00", delta: "เงินสด 0%", tone: "neutral" },
-        { label: "กำลังซื้อ", value: "$0.00", delta: "พร้อมใช้", tone: "neutral" }
+        { label: "มูลค่าพอร์ต", value: "$0.00", delta: "0%", tone: "neutral", rawValue: 0 },
+        { label: "กำไร/ขาดทุนวันนี้", value: "$0.00", delta: "0%", tone: "neutral", rawValue: 0 },
+        { label: "ผลตอบแทนรวม", value: "$0.00", delta: "0%", tone: "neutral", rawValue: 0 }
       ];
       return { metrics: emptyMetrics, allocation: [], positions: [], isLive: true };
     }
@@ -132,22 +130,23 @@ export async function getPortfolio(): Promise<PortfolioData> {
         label: "มูลค่าพอร์ต", 
         value: formatCurrency(totalValue), 
         delta: totalCost > 0 ? formatPercent((totalValue - totalCost) / totalCost) : "0%", 
-        tone: totalValue >= totalCost ? "gain" : "loss"
+        tone: totalValue >= totalCost ? "gain" : "loss",
+        rawValue: totalValue
       },
       { 
         label: "กำไร/ขาดทุนวันนี้", 
         value: `${dayGainTotal >= 0 ? "+" : ""}${formatCurrency(dayGainTotal)}`, 
         delta: totalValue - dayGainTotal > 0 ? formatPercent(dayGainTotal / (totalValue - dayGainTotal)) : "0%", 
-        tone: dayGainTotal >= 0 ? "gain" : "loss"
+        tone: dayGainTotal >= 0 ? "gain" : "loss",
+        rawValue: dayGainTotal
       },
       { 
         label: "ผลตอบแทนรวม", 
         value: `${(totalValue - totalCost) >= 0 ? "+" : ""}${formatCurrency(totalValue - totalCost)}`, 
         delta: totalCost > 0 ? formatPercent((totalValue - totalCost) / totalCost) : "0%", 
-        tone: (totalValue - totalCost) >= 0 ? "gain" : "loss"
-      },
-      { label: "เงินสดสำรอง", value: "$0.00", delta: "เงินสด 0%", tone: "neutral" },
-      { label: "กำลังซื้อ", value: "$0.00", delta: "พร้อมใช้", tone: "neutral" }
+        tone: (totalValue - totalCost) >= 0 ? "gain" : "loss",
+        rawValue: totalValue - totalCost
+      }
     ];
 
     const allocation = Array.from(allocationMap.entries())

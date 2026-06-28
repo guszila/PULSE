@@ -43,7 +43,7 @@ type FinnhubQuote = {
 import { unstable_cache } from "next/cache";
 
 export const getDashboardData = async (symbol: string = "AAPL", customSymbols?: string[]): Promise<AlphaEdgeDashboardData> => {
-  const cacheKeySuffix = customSymbols?.length ? customSymbols.join("-") : "default";
+  const cacheKeySuffix = customSymbols?.length ? customSymbols.join("-") : "default-v2";
   const cachedFn = unstable_cache(
     async () => {
   const [watchlistResult, overviewResult, fundamentalResult, newsResult, macroResult, candleResult] = await Promise.all([
@@ -233,9 +233,8 @@ async function getMarketOverview(): Promise<ProviderResult<MarketOverviewItem[]>
   const labels = [
     { symbol: "SPY", name: "S&P 500" },
     { symbol: "QQQ", name: "NASDAQ" },
-    { symbol: "DIA", name: "Dow Jones" },
-    { symbol: "IWM", name: "Russell 2000" },
-    { symbol: "^VIX", name: "VIX" }
+    { symbol: "GLD", name: "Gold" },
+    { symbol: "USO", name: "Crude Oil" }
   ];
 
   const quotes = await Promise.all(

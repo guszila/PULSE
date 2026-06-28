@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { PortfolioPosition } from "@/lib/portfolio-api";
-import { Trash2, Plus, LayoutList, GripVertical } from "lucide-react";
+import { Trash2, Plus, LayoutList, GripVertical, ScanLine, Loader2, Sparkles, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { StockLogo } from "@/components/stock-logo";
 
 export function PortfolioManager({ initialPositions, userId }: { initialPositions: PortfolioPosition[], userId: string | null }) {
@@ -14,13 +14,17 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
   const [shares, setShares] = useState("");
   const [cost, setCost] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   
   // New state for UX improvements
   const [searchResults, setSearchResults] = useState<{symbol: string, name: string}[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Use useEffect to handle clicks outside of the dropdown...
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -36,7 +40,6 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
       setSearchResults([]);
       return;
     }
-    // Only search if user hasn't typed an exact match that we already selected
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${symbol}`);
@@ -52,7 +55,6 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
   const handleSelectSymbol = async (selectedSymbol: string) => {
     setSymbol(selectedSymbol);
     setShowDropdown(false);
-    
     try {
       const res = await fetch(`/api/quote?symbol=${selectedSymbol}`);
       if (res.ok) {
@@ -63,6 +65,95 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
       }
     } catch (e) {}
   };
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!userId) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("ไฟล์รูปภาพใหญ่เกินไป (จำกัด 5MB)");
+      return;
+    }
+
+    setIsScanning(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        const apiKey = window.localStorage.getItem("alphaedge-gemini-key") || "";
+
+        const res = await fetch("/api/vision", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-gemini-key": apiKey
+          },
+          body: JSON.stringify({ 
+            imageBase64: base64String, 
+            mimeType: file.type 
+          })
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error);
+        
+        if (data.result && Array.isArray(data.result) && data.result.length > 0) {
+          setBusy(true);
+          let successCount = 0;
+          for (const stock of data.result) {
+             if (stock.symbol && stock.shares && stock.average_cost) {
+                const upperSymbol = stock.symbol.toUpperCase();
+                // Check if already exists
+                const { data: existing } = await supabase
+                  .from("positions")
+                  .select("id")
+                  .eq("user_id", userId)
+                  .eq("symbol", upperSymbol)
+                  .maybeSingle();
+
+                if (existing) {
+                  // Update existing
+                  const { error } = await supabase
+                    .from("positions")
+                    .update({
+                      shares: Number(stock.shares),
+                      average_cost: Number(stock.average_cost)
+                    })
+                    .eq("id", existing.id);
+                  if (!error) successCount++;
+                } else {
+                  // Insert new
+                  const { error } = await supabase
+                    .from("positions")
+                    .insert({
+                      user_id: userId,
+                      symbol: upperSymbol,
+                      shares: Number(stock.shares),
+                      average_cost: Number(stock.average_cost)
+                    });
+                  if (!error) successCount++;
+                }
+             }
+          }
+          alert(`สแกนพอร์ตสำเร็จ! นำเข้าข้อมูลหุ้น ${successCount} รายการ`);
+          window.location.reload();
+        } else {
+          alert("ไม่พบข้อมูลพอร์ตการลงทุนในรูปภาพนี้ครับ");
+          setIsScanning(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      alert(error.message || "เกิดข้อผิดพลาดในการสแกนรูปภาพ");
+      setIsScanning(false);
+      setBusy(false);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -121,85 +212,174 @@ export function PortfolioManager({ initialPositions, userId }: { initialPosition
             {positions.length} รายการ
           </span>
         </CardTitle>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => setIsAdding(!isAdding)}
-          className={`h-8 w-8 shrink-0 rounded-full transition-all duration-300 ${isAdding ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] rotate-45' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleImageUpload} 
+            className="hidden" 
+          />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning || busy}
+            className="h-8 border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-all font-medium text-xs hidden sm:flex"
+          >
+            {isScanning ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="mr-1.5 h-3.5 w-3.5 text-indigo-400" />
+            )}
+            {isScanning ? "AI กำลังอ่านภาพ..." : "สแกนภาพพอร์ต"}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning || busy}
+            className="h-8 w-8 sm:hidden border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20"
+          >
+             {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4 text-indigo-400" />}
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsAdding(!isAdding)}
+            className={`h-8 w-8 shrink-0 rounded-full transition-all duration-300 ${isAdding ? 'bg-zinc-700 text-white rotate-45' : 'bg-white/5 text-zinc-300 hover:bg-white/10'}`}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent className="pt-5 space-y-6">
         {positions.length > 0 ? (
-          <div className="space-y-2.5">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_40px] gap-2 px-4 pb-2 text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-              <div>สินทรัพย์</div>
-              <div className="text-right">จำนวนถือครอง</div>
-              <div className="text-right">ต้นทุนเฉลี่ย</div>
-              <div className="text-right">ราคาปัจจุบัน</div>
-              <div></div>
+          <div className="space-y-0">
+            {/* Header row */}
+            <div className="flex justify-between items-center px-2 pb-2 text-[11px] font-medium text-zinc-500 mb-2 border-b border-white/[0.05]">
+              <div>{positions.length} assets</div>
+              <div className="flex gap-12 sm:gap-16">
+                <div className="text-right">Holding Value (THB)</div>
+                <div className="text-right w-24">% Profit & Amount</div>
+              </div>
             </div>
             
-            {positions.map(p => (
-              <div 
-                key={p.id} 
-                className="group flex items-center justify-between rounded-2xl border border-white/[0.04] bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.04] hover:border-white/[0.08]"
-              >
-                <div className="flex items-center gap-3 w-full grid-cols-[1.5fr_1fr_1fr_1fr_40px] grid">
-                  {/* Stock Info */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.05]">
-                      <StockLogo symbol={p.symbol} className="h-full w-full" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-zinc-100">{p.symbol}</div>
-                      <div className="text-[10px] text-zinc-500">หุ้นสหรัฐฯ</div>
-                    </div>
-                  </div>
-                  
-                  {/* Shares */}
-                  <div className="flex flex-col items-end justify-center">
-                    <span className="text-sm font-semibold text-zinc-200">{p.shares}</span>
-                    <span className="text-[10px] text-zinc-500">หุ้น</span>
-                  </div>
-                  
-                  {/* Avg Cost */}
-                  <div className="flex flex-col items-end justify-center">
-                    <span className="text-sm font-semibold text-zinc-200">${p.average_cost.toFixed(2)}</span>
-                    <span className="text-[10px] text-zinc-500">ต่อหุ้น</span>
-                  </div>
-                  
-                  {/* Current Price & Change */}
-                  <div className="flex flex-col items-end justify-center">
-                    <span className="text-sm font-semibold text-zinc-200">${(p.current_price ?? p.average_cost).toFixed(2)}</span>
-                    <span className={`text-[10px] font-medium ${
-                      (p.day_gain_percent ?? 0) > 0 ? "text-emerald-400" : (p.day_gain_percent ?? 0) < 0 ? "text-rose-400" : "text-zinc-500"
-                    }`}>
-                      {(p.day_gain_percent ?? 0) > 0 ? "+" : ""}{((p.day_gain_percent ?? 0) * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                  
-                  {/* Actions */}
-                  <div className="flex items-center justify-end">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDelete(p.id)} 
-                      disabled={busy} 
-                      className="h-8 w-8 rounded-full text-zinc-600 opacity-0 group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-400 transition-all focus:opacity-100"
+            {(() => {
+              const totalPortfolioValueUSD = positions.reduce((sum, p) => sum + (p.total_value || p.shares * (p.current_price ?? p.average_cost)), 0);
+              const THB_RATE = 34.50;
+
+              return positions.map((p) => {
+                const positionValueUSD = p.total_value || p.shares * (p.current_price ?? p.average_cost);
+                const positionValueTHB = positionValueUSD * THB_RATE;
+                const allocationPercent = totalPortfolioValueUSD > 0 ? (positionValueUSD / totalPortfolioValueUSD) * 100 : 0;
+                
+                // Use total_return for Unrealized P/L if available, otherwise calculate it
+                const unrealizedPlUSD = p.total_return ?? (positionValueUSD - (p.shares * p.average_cost));
+                const unrealizedPlTHB = unrealizedPlUSD * THB_RATE;
+                const unrealizedPlPercent = p.total_return_percent ?? (p.shares * p.average_cost > 0 ? unrealizedPlUSD / (p.shares * p.average_cost) : 0);
+                
+                const isGain = unrealizedPlUSD >= 0;
+
+                return (
+                  <div key={p.id} className="group relative flex flex-col border-b border-white/[0.04]">
+                    <div 
+                      onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                      className="flex items-center justify-between py-4 hover:bg-white/[0.02] px-2 rounded-xl transition-colors cursor-pointer"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      {/* Left: Stock & Allocation */}
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-900 border border-white/[0.05]">
+                          <StockLogo symbol={p.symbol} className="h-full w-full" />
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="text-sm font-bold text-zinc-100">{p.symbol}</div>
+                          <div className="text-[11px] text-zinc-400 mt-0.5 flex items-center gap-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-3 h-3 text-zinc-500">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                            </svg>
+                            {allocationPercent.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Right side containers */}
+                      <div className="flex gap-8 sm:gap-16 items-center">
+                        {/* Middle: Holding Value */}
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-semibold text-zinc-100">
+                            {new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(positionValueTHB)}
+                          </span>
+                          <span className="text-[11px] text-zinc-500 mt-0.5 font-medium">
+                            ≈ {new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(positionValueUSD)} USD
+                          </span>
+                        </div>
+                        
+                        {/* Right: Profit & Amount */}
+                        <div className="flex flex-col items-end w-24">
+                          <span className={`text-sm font-bold flex items-center gap-1 ${isGain ? "text-emerald-400" : "text-rose-400"}`}>
+                            {isGain ? (
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            ) : (
+                              <ArrowDownRight className="w-3.5 h-3.5" />
+                            )}
+                            {isGain ? "+" : ""}{(unrealizedPlPercent * 100).toFixed(2)}%
+                          </span>
+                          <span className={`text-[11px] font-medium mt-0.5 ${isGain ? "text-emerald-400" : "text-rose-400"}`}>
+                            ({isGain ? "+" : ""}{new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(unrealizedPlTHB)} THB)
+                          </span>
+                        </div>
+
+                        {/* Delete Action (Hidden by default, shows on hover) */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} 
+                          disabled={busy} 
+                          className="absolute right-2 h-8 w-8 rounded-full text-zinc-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500/20 hover:text-rose-400 transition-all focus:opacity-100 bg-black/50 backdrop-blur-md border border-white/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {expandedId === p.id && (
+                      <div className="px-4 pb-4 pt-2 grid grid-cols-2 gap-4 text-sm animate-in slide-in-from-top-2 fade-in duration-200">
+                        <div className="flex flex-col">
+                          <span className="text-zinc-500 text-[11px] mb-1 font-medium">Outstanding Shares</span>
+                          <span className="text-zinc-200 font-semibold">{p.shares}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-zinc-500 text-[11px] mb-1 font-medium">Price (USD) & 1D Change</span>
+                          <span className="text-zinc-200 font-semibold flex items-center gap-2">
+                            {new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p.current_price ?? p.average_cost)}
+                            <span className={`text-[11px] font-bold ${((p.day_gain_percent ?? 0) >= 0) ? "text-emerald-400" : "text-rose-400"}`}>
+                              {((p.day_gain_percent ?? 0) >= 0) ? "↗ " : "↘ "}{Math.abs((p.day_gain_percent ?? 0) * 100).toFixed(2)}%
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-zinc-500 text-[11px] mb-1 font-medium">Cost per Share (USD)</span>
+                          <span className="text-zinc-200 font-semibold">{new Intl.NumberFormat("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(p.average_cost)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-zinc-500 text-[11px] mb-1 font-medium">Total Cost (USD)</span>
+                          <span className="text-zinc-200 font-semibold">{new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p.shares * p.average_cost)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] py-12 text-center">
-            <GripVertical className="h-8 w-8 text-zinc-600 mb-3" />
+            <LayoutList className="h-8 w-8 text-zinc-600 mb-3" />
             <div className="text-sm font-medium text-zinc-300">ยังไม่มีหุ้นในพอร์ต</div>
             <p className="mt-1 text-xs text-zinc-500">เพิ่มหุ้นที่คุณถือครองเพื่อติดตามผลกำไรขาดทุน</p>
           </div>

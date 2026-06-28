@@ -65,3 +65,49 @@ export async function removeWatchlistSymbol(symbol: string) {
   revalidatePath("/stocks/[symbol]", "page");
   return { success: true };
 }
+
+export async function reorderWatchlist(symbols: string[]) {
+  if (!symbols || !Array.isArray(symbols) || symbols.length === 0) return { success: true };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: authData } = await supabase.auth.getUser();
+
+  if (authData.user) {
+    // Hack: Update created_at sequentially to preserve the new order in Supabase
+    // since the query relies on sorting by created_at.
+    const now = Date.now();
+    for (let i = 0; i < symbols.length; i++) {
+      await supabase.from("watchlists").update({ 
+        created_at: new Date(now + i * 1000).toISOString() 
+      }).eq("user_id", authData.user.id).eq("symbol", symbols[i]);
+    }
+  } else {
+    const cookieStore = await cookies();
+    cookieStore.set("alphaedge_watchlist", symbols.join(","), { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/watchlist");
+  return { success: true };
+}
+
+export async function toggleWatchlistPin(symbol: string) {
+  const upperSymbol = symbol.toUpperCase().trim();
+  if (!upperSymbol) return { error: "Symbol is required" };
+
+  const cookieStore = await cookies();
+  const currentCookie = cookieStore.get("alphaedge_pinned_watchlist")?.value;
+  let pinned = currentCookie ? currentCookie.split(",").filter(Boolean) : [];
+  
+  if (pinned.includes(upperSymbol)) {
+    pinned = pinned.filter(s => s !== upperSymbol);
+  } else {
+    pinned.push(upperSymbol);
+  }
+  
+  cookieStore.set("alphaedge_pinned_watchlist", pinned.join(","), { maxAge: 60 * 60 * 24 * 365, path: "/" });
+
+  revalidatePath("/");
+  revalidatePath("/watchlist");
+  return { success: true, pinned };
+}

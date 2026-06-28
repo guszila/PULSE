@@ -7,6 +7,7 @@ import { NewsCard } from "@/components/stock/news-card";
 import { StockChartSection } from "@/components/stock/stock-chart-section";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { SymbolTracker } from "@/components/shared/symbol-tracker";
 
 export const revalidate = 300;
 
@@ -18,6 +19,7 @@ export default async function StockSymbolPage({ params }: { params: Promise<{ sy
 
   return (
     <>
+      <SymbolTracker symbol={symbol} />
       <AutoRefresh intervalMs={60000} />
       <div className="mt-2 mb-4">
         <GlobalSearch />

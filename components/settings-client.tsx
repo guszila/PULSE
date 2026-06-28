@@ -8,7 +8,7 @@ import { SupabaseAuthCard } from "@/components/settings/supabase-auth-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import type { AlphaEdgeDashboardData } from "@/lib/market-data";
 import type { User } from "@supabase/supabase-js";
-import { Moon, Sun, Wallet, Gauge, KeyRound, Bell, LayoutDashboard } from "lucide-react";
+import { Moon, Sun, Wallet, Gauge, KeyRound, Bell, LayoutDashboard, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export function SettingsClient({ data }: { data: AlphaEdgeDashboardData }) {
@@ -18,6 +18,7 @@ export function SettingsClient({ data }: { data: AlphaEdgeDashboardData }) {
   const [layoutMode, setLayoutMode] = useState("DETAILED");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [customFinnhubKey, setCustomFinnhubKey] = useState("");
+  const [customGeminiKey, setCustomGeminiKey] = useState("");
   
   const [supabaseStatus, setSupabaseStatus] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -43,8 +44,11 @@ export function SettingsClient({ data }: { data: AlphaEdgeDashboardData }) {
     const savedNotifications = window.localStorage.getItem("alphaedge-notifications");
     if (savedNotifications !== null) setNotificationsEnabled(savedNotifications === "true");
     
-    const savedApiKey = window.localStorage.getItem("alphaedge-finnhub-key");
-    if (savedApiKey) setCustomFinnhubKey(savedApiKey);
+    const savedFinnhubKey = window.localStorage.getItem("alphaedge-finnhub-key");
+    if (savedFinnhubKey) setCustomFinnhubKey(savedFinnhubKey);
+
+    const savedGeminiKey = window.localStorage.getItem("alphaedge-gemini-key");
+    if (savedGeminiKey) setCustomGeminiKey(savedGeminiKey);
 
     // Auth & Status
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -101,6 +105,12 @@ export function SettingsClient({ data }: { data: AlphaEdgeDashboardData }) {
     const val = e.target.value;
     setCustomFinnhubKey(val);
     window.localStorage.setItem("alphaedge-finnhub-key", val);
+  }
+
+  function handleCustomGeminiKeyChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setCustomGeminiKey(val);
+    window.localStorage.setItem("alphaedge-gemini-key", val);
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement> | React.MouseEvent) {
@@ -267,24 +277,51 @@ export function SettingsClient({ data }: { data: AlphaEdgeDashboardData }) {
         {/* API Settings Group */}
         <div>
           <h3 className="text-sm font-semibold text-zinc-400 mb-3 ml-1 uppercase tracking-wider">ขั้นสูง (API)</h3>
-          <Card className="flex flex-col p-5">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.04]">
-                  <KeyRound className="h-4 w-4 text-emerald-400" />
+          <Card className="flex flex-col p-5 space-y-6">
+            
+            {/* Finnhub */}
+            <div>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.04]">
+                    <KeyRound className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-zinc-100">Finnhub API Key ส่วนตัว</div>
+                  <div className="text-xs text-zinc-500 mt-1 leading-relaxed">หากคุณพบปัญหาโหลดข้อมูลช้า หรือติด Rate Limit ของเว็บ คุณสามารถใช้ API Key ของคุณเองจาก Finnhub ได้ฟรี</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-zinc-100">Finnhub API Key ส่วนตัว</div>
-                <div className="text-xs text-zinc-500 mt-1 leading-relaxed">หากคุณพบปัญหาโหลดข้อมูลช้า หรือติด Rate Limit ของเว็บ คุณสามารถใช้ API Key ของคุณเองจาก Finnhub ได้ฟรี</div>
-              </div>
+              <input 
+                type="password" 
+                placeholder="กรอก Finnhub API Key..." 
+                value={customFinnhubKey}
+                onChange={handleCustomApiKeyChange}
+                className="h-10 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 transition-colors"
+              />
             </div>
-            <input 
-              type="password" 
-              placeholder="กรอก API Key..." 
-              value={customFinnhubKey}
-              onChange={handleCustomApiKeyChange}
-              className="h-10 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 transition-colors"
-            />
-            <div className="mt-3 text-[11px] text-zinc-500/80 leading-relaxed bg-zinc-900/50 p-2.5 rounded-lg border border-white/[0.02]">
+
+            <hr className="border-white/[0.04]" />
+
+            {/* Gemini */}
+            <div>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.04]">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-zinc-100">Gemini AI API Key (เพื่อใช้งานฟีเจอร์ AI)</div>
+                  <div className="text-xs text-zinc-500 mt-1 leading-relaxed">รับ API Key ได้ฟรีจาก Google AI Studio เพื่อใช้เปิดใช้งานผู้ช่วยวิเคราะห์หุ้นบนแอปนี้</div>
+                </div>
+              </div>
+              <input 
+                type="password" 
+                placeholder="กรอก Gemini API Key..." 
+                value={customGeminiKey}
+                onChange={handleCustomGeminiKeyChange}
+                className="h-10 w-full rounded-md border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+
+            <div className="mt-2 text-[11px] text-zinc-500/80 leading-relaxed bg-zinc-900/50 p-2.5 rounded-lg border border-white/[0.02]">
               * คีย์ของคุณจะถูกจัดเก็บไว้อย่างปลอดภัยในเบราว์เซอร์นี้เท่านั้น (Local Storage) และจะไม่ถูกส่งไปยังเซิร์ฟเวอร์ของเรา หรือบุคคลที่สามแต่อย่างใด
             </div>
           </Card>

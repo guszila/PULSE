@@ -18,11 +18,13 @@ import {
   Sparkles,
   Sun,
   Target,
-  X
+  X,
+  Loader2
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { AlphaEdgeLogo } from "@/components/ui/logo";
+import ReactMarkdown from "react-markdown";
 
 type AlphaEdgeTheme = "dark" | "light";
 
@@ -217,17 +219,60 @@ function MobileBottomNav({ pathname }: { pathname: string }) {
 }
 
 function AssistantSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [messages, setMessages] = useState<{role: "user" | "ai", content: string}[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
+
+  async function handleSend(text: string = input) {
+    if (!text.trim() || isLoading) return;
+    
+    const newMessages = [...messages, { role: "user" as const, content: text.trim() }];
+    setMessages(newMessages);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const apiKey = window.localStorage.getItem("alphaedge-gemini-key") || "";
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-gemini-key": apiKey
+        },
+        body: JSON.stringify({ messages: newMessages })
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
+      
+      setMessages([...newMessages, { role: "ai", content: data.result }]);
+    } catch (error: any) {
+      setMessages([...newMessages, { role: "ai", content: `**Error:** ${error.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <AnimatePresence>
       {open && (
         <motion.aside
-          className="fixed inset-y-0 right-0 z-50 w-full border-l border-white/[0.08] bg-[#080908]/95 p-4 shadow-glass backdrop-blur-2xl sm:w-[420px]"
+          className="fixed inset-y-0 right-0 z-50 w-full flex flex-col border-l border-white/[0.08] bg-[#080908]/95 p-4 shadow-glass backdrop-blur-2xl sm:w-[420px]"
           initial={{ x: 460 }}
           animate={{ x: 0 }}
           exit={{ x: 460 }}
           transition={{ type: "spring", damping: 32, stiffness: 260 }}
         >
-          <div className="flex items-center justify-between">
+          {/* Header */}
+          <div className="flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.06]">
                 <Bot className="h-5 w-5" />
@@ -241,30 +286,78 @@ function AssistantSidebar({ open, onClose }: { open: boolean; onClose: () => voi
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <div className="mt-6 space-y-3">
-            {[
-              "AAPL ใกล้แนวรับหรือแนวต้านแค่ไหน?",
-              "เปรียบเทียบความแข็งแรงของ NVDA กับ MSFT",
-              "หาหุ้นที่ใกล้ breakout",
-              "สรุปความเสี่ยงของพอร์ตวันนี้"
-            ].map((prompt) => (
-              <button
-                key={prompt}
-                className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left text-sm text-zinc-300 transition hover:bg-white/[0.07]"
-              >
-                {prompt}
-              </button>
-            ))}
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto mt-6 mb-4 pr-2 space-y-4 custom-scrollbar" ref={scrollRef}>
+            {messages.length === 0 ? (
+              <div className="space-y-3">
+                {[
+                  "AAPL ใกล้แนวรับหรือแนวต้านแค่ไหน?",
+                  "เปรียบเทียบความแข็งแรงของ NVDA กับ MSFT",
+                  "หาหุ้นที่ใกล้ breakout",
+                  "สรุปความเสี่ยงของพอร์ตวันนี้"
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => handleSend(prompt)}
+                    className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left text-sm text-zinc-300 transition hover:bg-white/[0.07]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col space-y-4 pb-4">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[90%] rounded-2xl p-3 px-4 text-sm ${
+                      msg.role === 'user' 
+                        ? 'bg-indigo-600 text-white rounded-br-none' 
+                        : 'bg-white/[0.06] text-zinc-200 rounded-tl-none prose prose-invert prose-sm prose-p:leading-relaxed prose-a:text-indigo-400'
+                    }`}>
+                      {msg.role === 'user' ? (
+                        msg.content
+                      ) : (
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] rounded-2xl p-4 bg-white/[0.06] rounded-tl-none flex flex-col gap-2.5 border border-white/[0.02]">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-[spin_4s_linear_infinite]" />
+                        <span className="text-xs font-medium text-indigo-300/80 animate-pulse">AI กำลังประมวลผล...</span>
+                      </div>
+                      <div className="flex space-x-1.5 px-1 pl-6">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="rounded-3xl border border-white/[0.08] bg-white/[0.04] p-2 pl-3">
+
+          {/* Input Area */}
+          <div className="shrink-0 mt-auto pb-safe">
+            <div className="rounded-3xl border border-white/[0.08] bg-white/[0.04] p-2 pl-3 focus-within:border-indigo-500/50 focus-within:bg-white/[0.06] transition-colors">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-zinc-500" />
                 <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSend();
+                  }}
                   className="h-10 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
                   placeholder="ถามเรื่องจุดเข้า ความเสี่ยง แนวรับ..."
+                  disabled={isLoading}
                 />
-                <Button size="sm">ถาม</Button>
+                <Button size="sm" onClick={() => handleSend()} disabled={isLoading || !input.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white border-0">ถาม</Button>
               </div>
             </div>
           </div>
