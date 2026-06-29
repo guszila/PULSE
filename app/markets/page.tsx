@@ -3,7 +3,7 @@ import { SectionTitle } from "@/components/shared/section-title";
 import { Card, CardContent } from "@/components/ui/card";
 import { sectors } from "@/lib/market-data";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function MarketsPage() {
   const data = await getDashboardData();
@@ -36,3 +36,4 @@ export default async function MarketsPage() {
     </section>
   );
 }
+

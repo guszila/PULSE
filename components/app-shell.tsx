@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={`min-h-screen text-zinc-100 ${isLightTheme ? "theme-light" : "theme-dark"}`}>
-      <div className="fixed inset-x-0 top-0 z-40 border-b border-white/[0.08] bg-[#070807]/92 backdrop-blur-2xl lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-40 border-b border-white/[0.08] bg-[#070807]/92 backdrop-blur-2xl lg:hidden pt-[env(safe-area-inset-top)]">
         <div className="flex h-14 items-center justify-between px-3">
           <Brand />
           <div className="flex items-center gap-1">
@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      <section className="px-3 pb-36 pt-16 sm:px-6 lg:ml-[264px] lg:px-8 lg:pb-28 lg:pt-6">
+      <section className="px-3 pb-36 pt-[calc(env(safe-area-inset-top)+4.5rem)] sm:px-6 lg:ml-[264px] lg:px-8 lg:pb-28 lg:pt-6">
         {children}
       </section>
 

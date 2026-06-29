@@ -64,10 +64,29 @@ export function GlobalSearch() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const symbol = query.trim().toUpperCase();
-    if (symbol) {
-      router.push(`/stocks/${symbol}`);
+    const trimmed = query.trim().toUpperCase();
+    if (!trimmed) return;
+    
+    // Find if the query matches any symbol exactly
+    const exactMatch = POPULAR_STOCKS.find(s => s.symbol === trimmed);
+    if (exactMatch) {
+      router.push(`/stocks/${exactMatch.symbol}`);
+      setIsFocused(false);
+      return;
     }
+    
+    // Find if there is a good match in popular stocks
+    const bestMatch = POPULAR_STOCKS.find(
+      (s) => s.symbol.toLowerCase().includes(trimmed.toLowerCase()) || s.name.toLowerCase().includes(trimmed.toLowerCase())
+    );
+
+    if (bestMatch) {
+      router.push(`/stocks/${bestMatch.symbol}`);
+      setQuery(bestMatch.symbol);
+    } else {
+      router.push(`/stocks/${trimmed}`);
+    }
+    setIsFocused(false);
   }
 
   return (

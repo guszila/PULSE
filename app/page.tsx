@@ -11,7 +11,7 @@ import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { SymbolTracker } from "@/components/shared/symbol-tracker";
 import { cookies } from "next/headers";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ symbol?: string }> }) {
   const resolvedParams = await searchParams;
@@ -64,3 +64,4 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
     </>
   );
 }
+

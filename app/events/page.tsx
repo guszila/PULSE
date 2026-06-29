@@ -1,6 +1,6 @@
 import { getDashboardData } from "@/lib/free-market-api";
 import { EventsCard } from "@/components/events/events-card";
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function EventsPage() {
   const data = await getDashboardData();
@@ -11,3 +11,4 @@ export default async function EventsPage() {
     </section>
   );
 }
+

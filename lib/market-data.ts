@@ -78,6 +78,14 @@ export type SelectedStock = {
   volume: number;
 };
 
+export type NearSupportStock = {
+  symbol: string;
+  company: string;
+  price: number;
+  support: number;
+  distance: number;
+};
+
 export type DecisionSnapshot = {
   bias: "Bullish" | "Neutral" | "Bearish";
   actionLabel: string;
@@ -100,6 +108,7 @@ export type AlphaEdgeDashboardData = {
   candleData: CandlePoint[];
   indicators: IndicatorItem[];
   supportResistance: SupportResistanceData;
+  nearSupport: NearSupportStock[];
   decision: DecisionSnapshot;
   dataSource: string;
   isLive: boolean;
@@ -110,6 +119,7 @@ export type AlphaEdgeDashboardData = {
     macroLive: boolean;
   };
   updatedAt: string;
+  notFound?: boolean;
 };
 
 export const portfolioMetrics = [
@@ -305,6 +315,7 @@ export const fallbackDashboardData: AlphaEdgeDashboardData = {
   candleData,
   indicators,
   supportResistance,
+  nearSupport: [],
   decision,
   dataSource: "ข้อมูลตัวอย่าง",
   isLive: false,

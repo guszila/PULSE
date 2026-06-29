@@ -3,7 +3,7 @@ import { getUserWatchlistSymbols, getPinnedWatchlistSymbols } from "@/lib/watchl
 import { SupportResistanceCard } from "@/components/watchlist/support-resistance-card";
 import { WatchlistTable } from "@/components/watchlist/watchlist-table";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function WatchlistPage() {
   const [userSymbols, pinnedSymbols] = await Promise.all([
@@ -30,3 +30,4 @@ export default async function WatchlistPage() {
     </div>
   );
 }
+

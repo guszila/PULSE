@@ -7,14 +7,19 @@ import { StockChartSection } from "@/components/stock/stock-chart-section";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { SymbolTracker } from "@/components/shared/symbol-tracker";
+import { notFound } from "next/navigation";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function StockSymbolPage({ params }: { params: Promise<{ symbol: string }> }) {
   const resolvedParams = await params;
   const symbol = resolvedParams.symbol.toUpperCase();
   const userSymbols = await getUserWatchlistSymbols();
   const data = await getDashboardData(symbol, userSymbols);
+
+  if (data.notFound) {
+    notFound();
+  }
 
   return (
     <>

@@ -19,10 +19,27 @@ import {
   type NewsItem,
   type SelectedStock,
   type SupportResistanceData,
-  type WatchlistStock
+  type WatchlistStock,
+  type NearSupportStock
 } from "@/lib/market-data";
 
 const WATCHLIST_SYMBOLS = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "JPM", "LLY"];
+const MAG_7_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA"];
+const SMALL_CAP_SYMBOLS = ["PLTR", "SOFI", "RIVN", "HOOD", "COIN", "DKNG", "ROKU", "AFRM", "SQ", "CELH", "UPST", "OPEN"];
+const DIVIDEND_SYMBOLS = ["KO", "JNJ", "PG", "T", "VZ", "PFE", "PEP", "ABBV"];
+const AI_CHIP_SYMBOLS = ["NVDA", "AMD", "TSM", "ASML", "AVGO", "QCOM", "INTC", "MU"];
+const ETF_SYMBOLS = ["SPY", "QQQ", "VOO", "ARKK", "SMH"];
+
+// Extended pool of stocks including mid/small caps for the near support scanner
+const EXTENDED_SYMBOLS = Array.from(new Set([
+  ...WATCHLIST_SYMBOLS,
+  ...MAG_7_SYMBOLS,
+  ...SMALL_CAP_SYMBOLS,
+  ...DIVIDEND_SYMBOLS,
+  ...AI_CHIP_SYMBOLS,
+  ...ETF_SYMBOLS,
+  "UBER", "MSTR", "MARA", "RIOT", "SYM", "LCID", "CHWY", "CRWD", "DDOG", "CVNA"
+]));
 
 type ProviderResult<T> = {
   data: T;
@@ -47,8 +64,10 @@ export const getDashboardData = async (symbol: string = "AAPL", customSymbols?: 
   const cacheKeySuffix = customSymbols?.length ? customSymbols.join("-") : "default-v2";
   const cachedFn = unstable_cache(
     async () => {
+  const symbolsToFetchForWatchlist = Array.from(new Set([...(customSymbols || WATCHLIST_SYMBOLS), symbol]));
+  
   const [watchlistResult, overviewResult, fundamentalResult, newsResult, macroResult, candleResult] = await Promise.all([
-    getWatchlist(customSymbols),
+    getWatchlist(symbolsToFetchForWatchlist),
     getMarketOverview(),
     getFundamentals(symbol),
     getNews(symbol),
@@ -56,10 +75,36 @@ export const getDashboardData = async (symbol: string = "AAPL", customSymbols?: 
     getCandles(symbol)
   ]);
 
+  const stockQuote = watchlistResult.data.find((item) => item.symbol.toUpperCase() === symbol.toUpperCase());
+  
+  if (!stockQuote && !candleResult.live) {
+    return {
+      ...fallbackDashboardData,
+      notFound: true
+    };
+  }
+
+  if (stockQuote && candleResult.data.length > 0) {
+    const lastCandle = candleResult.data[candleResult.data.length - 1];
+    lastCandle.close = stockQuote.price;
+    if (stockQuote.price > lastCandle.high) lastCandle.high = stockQuote.price;
+    if (stockQuote.price < lastCandle.low) lastCandle.low = stockQuote.price;
+    if (stockQuote.volume > 0) lastCandle.volume = stockQuote.volume;
+  }
+
   const selectedStock = getSelectedStock(symbol, watchlistResult.data, candleResult.data);
   const indicatorsResult = buildIndicators(candleResult.data);
   const supportResistanceResult = buildSupportResistance(candleResult.data, selectedStock.price);
   const decisionResult = buildDecisionSnapshot(supportResistanceResult, indicatorsResult);
+  
+  // Use extended symbols for near support scanner so we can dynamically find stocks near support
+  const extendedWatchlistResult = await getWatchlist(EXTENDED_SYMBOLS);
+  let nearSupportResult = await getNearSupport(extendedWatchlistResult.data);
+  
+  // Sort by closest distance and limit to top 5
+  nearSupportResult = nearSupportResult
+    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))
+    .slice(0, 5);
 
   const liveSources = [watchlistResult, overviewResult, fundamentalResult, newsResult, macroResult, candleResult]
     .filter((result) => result.live)
@@ -75,6 +120,7 @@ export const getDashboardData = async (symbol: string = "AAPL", customSymbols?: 
     candleData: candleResult.data,
     indicators: indicatorsResult,
     supportResistance: supportResistanceResult,
+    nearSupport: nearSupportResult,
     decision: decisionResult,
     dataSource: liveSources.length > 0 ? Array.from(new Set(liveSources)).join(" + ") : fallbackDashboardData.dataSource,
     isLive: liveSources.length > 0,
@@ -88,13 +134,121 @@ export const getDashboardData = async (symbol: string = "AAPL", customSymbols?: 
   };
 },
 [`alphaedge-dashboard-data-${symbol}-${cacheKeySuffix}`],
-{ revalidate: 300, tags: ["dashboard", symbol] }
+{ revalidate: 60, tags: ["dashboard", symbol] }
 );
 
   return cachedFn();
 };
 
-async function fetchJson<T>(url: string, revalidate = 300): Promise<T | null> {
+export async function getNearSupport(watchlist: WatchlistStock[], filterDistance: boolean = true): Promise<NearSupportStock[]> {
+  const promises = watchlist.map(async (stock) => {
+    try {
+      const candlesResult = await getCandles(stock.symbol);
+      if (!candlesResult.live || candlesResult.data.length < 10) return null;
+      
+      const supportRes = buildSupportResistance(candlesResult.data, stock.price);
+      
+      const distanceStr = supportRes.distanceToSupport.replace("%", "").replace("+", "");
+      const distance = parseFloat(distanceStr);
+      
+      if (!filterDistance || (!isNaN(distance) && Math.abs(distance) <= 3)) {
+        return {
+          symbol: stock.symbol,
+          company: stock.company,
+          price: stock.price,
+          support: supportRes.support,
+          distance: isNaN(distance) ? 0 : distance
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+  
+  const results = await Promise.all(promises);
+  return results.filter((item): item is NearSupportStock => item !== null);
+}
+
+export const getAllNearSupportStocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const extendedWatchlistResult = await getWatchlist(EXTENDED_SYMBOLS);
+      let nearSupportResult = await getNearSupport(extendedWatchlistResult.data, true);
+      return nearSupportResult.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["all-near-support-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+export const getMag7Stocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const watchlistResult = await getWatchlist(MAG_7_SYMBOLS);
+      let result = await getNearSupport(watchlistResult.data, false);
+      return result.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["mag7-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+export const getSmallCapStocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const watchlistResult = await getWatchlist(SMALL_CAP_SYMBOLS);
+      let result = await getNearSupport(watchlistResult.data, false);
+      return result.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["small-cap-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+export const getDividendStocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const watchlistResult = await getWatchlist(DIVIDEND_SYMBOLS);
+      let result = await getNearSupport(watchlistResult.data, false);
+      return result.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["dividend-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+export const getAiChipStocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const watchlistResult = await getWatchlist(AI_CHIP_SYMBOLS);
+      let result = await getNearSupport(watchlistResult.data, false);
+      return result.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["ai-chip-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+export const getEtfStocks = async (): Promise<NearSupportStock[]> => {
+  const cachedFn = unstable_cache(
+    async () => {
+      const watchlistResult = await getWatchlist(ETF_SYMBOLS);
+      let result = await getNearSupport(watchlistResult.data, false);
+      return result.sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+    },
+    ["etf-stocks"],
+    { revalidate: 60, tags: ["screener"] }
+  );
+  return cachedFn();
+}
+
+async function fetchJson<T>(url: string, revalidate = 60): Promise<T | null> {
   try {
     const response = await fetch(url, {
       next: { revalidate },
@@ -152,7 +306,6 @@ async function getCandles(symbol: string): Promise<ProviderResult<CandlePoint[]>
       ? { data: rows, source: "Yahoo Finance", live: true }
       : { data: fallbackCandleData, source: "Mock fallback", live: false };
   } catch (error) {
-    console.error("Error fetching candles:", error);
     return { data: fallbackCandleData, source: "Mock fallback", live: false };
   }
 }
@@ -415,19 +568,81 @@ function buildIndicators(candles: CandlePoint[]): IndicatorItem[] {
 }
 
 function buildSupportResistance(candles: CandlePoint[], currentPrice: number): SupportResistanceData {
-  if (candles.length < 10 || currentPrice <= 0) {
+  if (candles.length < 20 || currentPrice <= 0) {
     return fallbackSupportResistance;
   }
 
+  // 1. Find Swing Lows (Support Fractals) and Swing Highs (Resistance Fractals)
+  const swingLows: number[] = [];
+  const swingHighs: number[] = [];
+  
+  for (let i = 2; i < candles.length - 2; i++) {
+    const cLow = candles[i].low;
+    if (cLow < candles[i-1].low && cLow < candles[i-2].low && cLow < candles[i+1].low && cLow < candles[i+2].low) {
+      swingLows.push(cLow);
+    }
+    
+    const cHigh = candles[i].high;
+    if (cHigh > candles[i-1].high && cHigh > candles[i-2].high && cHigh > candles[i+1].high && cHigh > candles[i+2].high) {
+      swingHighs.push(cHigh);
+    }
+  }
+
+  // 2. Calculate EMAs as dynamic support/resistance
+  const closes = candles.map(c => c.close);
+  const ema20 = ema(closes, 20);
+  const ema50 = ema(closes, 50);
+  const ema200 = ema(closes, 200);
+  const dynamicLevels = [ema20, ema50, ema200].filter(val => val > 0);
+  
+  // 3. Calculate Fibonacci Retracement Levels (highly credible reference points)
+  const recent60 = candles.slice(-60);
+  const highest60 = Math.max(...recent60.map(c => c.high));
+  const lowest60 = Math.min(...recent60.map(c => c.low));
+  const diff = highest60 - lowest60;
+  
+  const fibLevels = diff > 0 ? [
+    highest60 - diff * 0.236,
+    highest60 - diff * 0.382,
+    highest60 - diff * 0.500,
+    highest60 - diff * 0.618,
+    highest60 - diff * 0.786
+  ] : [];
+
+  // 4. Find credible Supports (below current price)
+  const validSupports = [...swingLows, ...dynamicLevels, ...fibLevels].filter(level => level < currentPrice * 0.998);
+  validSupports.sort((a, b) => b - a); // descending, closest to price first
+  
+  // Remove duplicates that are too close (within 1%)
+  const distinctSupports: number[] = [];
+  for (const s of validSupports) {
+    if (distinctSupports.length === 0 || Math.abs(distinctSupports[distinctSupports.length - 1] - s) / s > 0.01) {
+      distinctSupports.push(s);
+    }
+  }
+
+  let support = distinctSupports.length > 0 ? distinctSupports[0] : currentPrice * 0.95;
+  let strongSupport = distinctSupports.length > 1 ? distinctSupports[1] : support * 0.95;
+
+  // 5. Find credible Resistances (above current price)
+  const validResistances = [...swingHighs, ...dynamicLevels, ...fibLevels].filter(level => level > currentPrice * 1.002);
+  validResistances.sort((a, b) => a - b); // ascending, closest to price first
+  
+  const distinctResistances: number[] = [];
+  for (const r of validResistances) {
+    if (distinctResistances.length === 0 || Math.abs(distinctResistances[distinctResistances.length - 1] - r) / r > 0.01) {
+      distinctResistances.push(r);
+    }
+  }
+
+  let resistance = distinctResistances.length > 0 ? distinctResistances[0] : currentPrice * 1.05;
+  let strongResistance = distinctResistances.length > 1 ? distinctResistances[1] : resistance * 1.05;
+
   const recent = candles.slice(-80);
-  const lows = recent.map((item) => item.low).sort((a, b) => a - b);
-  const highs = recent.map((item) => item.high).sort((a, b) => a - b);
-  const support = nearestBelow(lows, currentPrice) ?? percentile(lows, 0.25);
-  const strongSupport = percentile(lows, 0.1);
-  const resistance = nearestAbove(highs, currentPrice) ?? percentile(highs, 0.75);
-  const strongResistance = percentile(highs, 0.9);
   const risk = Math.max(0.01, currentPrice - support);
   const reward = Math.max(0.01, resistance - currentPrice);
+  
+  // Count touches (price reacting at support/resistance levels)
   const touches = recent.filter(
     (item) => Math.abs(item.low - support) / support < 0.015 || Math.abs(item.high - resistance) / resistance < 0.015
   ).length;

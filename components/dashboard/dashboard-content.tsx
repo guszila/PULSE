@@ -1,11 +1,12 @@
 import { DecisionHero } from "@/components/dashboard/decision-hero";
 import { AiInsightCard } from "@/components/dashboard/ai-insight-card";
 import { MarketOverviewCard } from "@/components/dashboard/market-overview-card";
+import { NearSupportCard } from "@/components/dashboard/near-support-card";
 import { NewsCard } from "@/components/stock/news-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { getDashboardData } from "@/lib/free-market-api";
 import Link from "next/link";
-import { ArrowRight, Activity, TrendingUp } from "lucide-react";
+import { ArrowRight, Activity, TrendingUp, Target } from "lucide-react";
 
 interface DashboardContentProps {
   symbol: string;
@@ -44,6 +45,13 @@ export async function DashboardContent({ symbol, userSymbols }: DashboardContent
             </Link>
           </div>
           <MarketOverviewCard data={data} />
+          
+          <div className="pt-4 flex items-center justify-between">
+            <SectionTitle icon={Target}>
+              หุ้นใกล้แนวรับ <span className="text-zinc-500 font-normal ml-1">Near Support</span>
+            </SectionTitle>
+          </div>
+          <NearSupportCard data={data} />
         </section>
 
         <section className="space-y-4">
